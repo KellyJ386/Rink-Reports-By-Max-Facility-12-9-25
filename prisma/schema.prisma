@@ -1,0 +1,1077 @@
+// Max Facility Operations (MFO) - Prisma Schema
+// Ice Rink Management SaaS Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTHENTICATION & USER MANAGEMENT
+// ============================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// User Roles Enum (6 Roles as per PRD)
+enum UserRole {
+  SUPER_ADMIN      // Platform-wide access
+  FACILITY_ADMIN   // Full facility access, can use Form Builder
+  MANAGER          // Department-level access
+  SUPERVISOR       // Shift-level access
+  ICE_TECHNICIAN   // Ice operations access
+  STAFF            // Basic access
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  passwordHash  String?
+  phone         String?
+  role          UserRole  @default(STAFF)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  facilityUsers FacilityUser[]
+  formSubmissions FormSubmission[]
+  iceDepthReadings IceDepthReading[]
+  incidentReports IncidentReport[]
+  scheduleShifts ScheduleShift[]
+  timeOffRequests TimeOffRequest[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  createdForms  FormTemplate[] @relation("FormCreator")
+
+  @@index([email])
+  @@index([role])
+}
+
+// ============================================
+// MULTI-TENANCY: ORGANIZATIONS & FACILITIES
+// ============================================
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  logo        String?
+  address     String?
+  city        String?
+  state       String?
+  postalCode  String?
+  country     String   @default("US")
+  phone       String?
+  email       String?
+  website     String?
+  timezone    String   @default("America/New_York")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  facilities  Facility[]
+  subscription Subscription?
+
+  @@index([slug])
+}
+
+model Facility {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  slug            String
+  address         String?
+  city            String?
+  state           String?
+  postalCode      String?
+  latitude        Float?
+  longitude       Float?
+  phone           String?
+  email           String?
+  timezone        String   @default("America/New_York")
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rinks           Rink[]
+  facilityUsers   FacilityUser[]
+  formTemplates   FormTemplate[]
+  formSubmissions FormSubmission[]
+  incidentReports IncidentReport[]
+  schedules       Schedule[]
+  checklists      Checklist[]
+  equipmentItems  Equipment[]
+  alerts          Alert[]
+  weatherCache    WeatherCache?
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model Rink {
+  id              String   @id @default(cuid())
+  facilityId      String
+  name            String
+  rinkType        RinkType @default(STANDARD)
+  length          Float?   // in feet
+  width           Float?   // in feet
+  surfaceArea     Float?   // calculated sq ft
+  icePointsConfig Int      @default(25)  // 25, 35, or 47 points
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  facility        Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  iceDepthReadings IceDepthReading[]
+  iceMakeLogs     IceMakeLog[]
+  zamboniLogs     ZamboniLog[]
+
+  @@index([facilityId])
+}
+
+enum RinkType {
+  STANDARD    // NHL size 200x85
+  OLYMPIC     // Olympic size 200x100
+  RECREATIONAL
+  CURLING
+  CUSTOM
+}
+
+// Junction table for User-Facility access
+model FacilityUser {
+  id         String   @id @default(cuid())
+  userId     String
+  facilityId String
+  role       UserRole // Role within this specific facility
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, facilityId])
+  @@index([userId])
+  @@index([facilityId])
+}
+
+// ============================================
+// FORM BUILDER SYSTEM
+// ============================================
+
+enum FormCategory {
+  ICE_OPERATIONS
+  INCIDENT_REPORTING
+  REFRIGERATION
+  AIR_QUALITY
+  FACILITY_CHECKLIST
+  CUSTOM
+}
+
+enum FieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  EMAIL
+  PHONE
+  DROPDOWN
+  MULTI_SELECT
+  RADIO
+  CHECKBOX
+  TOGGLE
+  DATE
+  TIME
+  DATETIME
+  FILE_UPLOAD
+  PHOTO
+  SIGNATURE
+  SECTION_HEADER
+  INSTRUCTIONAL_TEXT
+  BODY_DIAGRAM      // For incident reports
+  RINK_DIAGRAM      // For ice depth (read-only in form)
+}
+
+model FormTemplate {
+  id              String       @id @default(cuid())
+  facilityId      String
+  createdById     String
+  name            String
+  description     String?
+  category        FormCategory
+  isActive        Boolean      @default(true)
+  isPublished     Boolean      @default(false)
+  version         Int          @default(1)
+
+  // Auto-populated header settings
+  includeWeather  Boolean      @default(true)
+  includeTimestamp Boolean     @default(true)
+  includeUser     Boolean      @default(true)
+  includeFacility Boolean      @default(true)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  facility        Facility     @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  createdBy       User         @relation("FormCreator", fields: [createdById], references: [id])
+  fields          FormField[]
+  submissions     FormSubmission[]
+
+  @@index([facilityId])
+  @@index([category])
+}
+
+model FormField {
+  id              String    @id @default(cuid())
+  formTemplateId  String
+  fieldType       FieldType
+  label           String
+  placeholder     String?
+  helpText        String?
+
+  // Validation
+  isRequired      Boolean   @default(false)
+  minValue        Float?
+  maxValue        Float?
+  minLength       Int?
+  maxLength       Int?
+  pattern         String?   // Regex pattern
+
+  // Options for dropdown, radio, multi-select
+  options         Json?     // Array of { value, label }
+
+  // Layout & Display
+  orderIndex      Int
+  sectionId       String?   // Group fields into sections
+  width           String    @default("full") // full, half, third
+
+  // Conditional Logic
+  conditionalLogic Json?    // { showIf: { fieldId, operator, value } }
+
+  // Default value
+  defaultValue    String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  formTemplate    FormTemplate @relation(fields: [formTemplateId], references: [id], onDelete: Cascade)
+  fieldResponses  FormFieldResponse[]
+
+  @@index([formTemplateId])
+  @@index([orderIndex])
+}
+
+model FormSubmission {
+  id              String   @id @default(cuid())
+  formTemplateId  String
+  facilityId      String
+  submittedById   String
+
+  // Auto-populated header data
+  submittedAt     DateTime @default(now())
+  weatherData     Json?    // { temp, humidity, conditions }
+
+  // Status
+  status          SubmissionStatus @default(SUBMITTED)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  reviewNotes     String?
+
+  // Metadata
+  deviceInfo      Json?    // { userAgent, platform }
+  ipAddress       String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  formTemplate    FormTemplate @relation(fields: [formTemplateId], references: [id])
+  facility        Facility     @relation(fields: [facilityId], references: [id])
+  submittedBy     User         @relation(fields: [submittedById], references: [id])
+  fieldResponses  FormFieldResponse[]
+  attachments     Attachment[]
+
+  @@index([formTemplateId])
+  @@index([facilityId])
+  @@index([submittedById])
+  @@index([submittedAt])
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+model FormFieldResponse {
+  id               String   @id @default(cuid())
+  formSubmissionId String
+  formFieldId      String
+  value            String?  @db.Text
+  numericValue     Float?
+  booleanValue     Boolean?
+  jsonValue        Json?    // For complex data like multi-select
+
+  createdAt        DateTime @default(now())
+
+  // Relations
+  formSubmission   FormSubmission @relation(fields: [formSubmissionId], references: [id], onDelete: Cascade)
+  formField        FormField      @relation(fields: [formFieldId], references: [id])
+
+  @@index([formSubmissionId])
+  @@index([formFieldId])
+}
+
+model Attachment {
+  id               String   @id @default(cuid())
+  formSubmissionId String?
+  incidentReportId String?
+
+  fileName         String
+  fileType         String
+  fileSize         Int
+  storageUrl       String   // GCS URL
+  thumbnailUrl     String?
+
+  uploadedAt       DateTime @default(now())
+
+  // Relations
+  formSubmission   FormSubmission? @relation(fields: [formSubmissionId], references: [id], onDelete: Cascade)
+  incidentReport   IncidentReport? @relation(fields: [incidentReportId], references: [id], onDelete: Cascade)
+
+  @@index([formSubmissionId])
+  @@index([incidentReportId])
+}
+
+// ============================================
+// MODULE 1: ICE DEPTH MONITORING
+// ============================================
+
+model IceDepthReading {
+  id              String   @id @default(cuid())
+  rinkId          String
+  recordedById    String
+
+  // Reading configuration
+  pointsConfig    Int      @default(25)  // 25, 35, or 47
+  readingPoints   Json     // Array of { pointId, x, y, depth }
+
+  // Analysis
+  averageDepth    Float?
+  minDepth        Float?
+  maxDepth        Float?
+  variance        Float?
+
+  // Gemini AI Analysis (Phase 3)
+  aiAnalysis      Json?    // { patterns, risks, recommendations }
+  aiAnalyzedAt    DateTime?
+
+  // Environmental conditions
+  ambientTemp     Float?
+  iceTemp         Float?
+  humidity        Float?
+
+  // Status
+  status          ReadingStatus @default(RECORDED)
+  notes           String?
+
+  recordedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  rink            Rink @relation(fields: [rinkId], references: [id], onDelete: Cascade)
+  recordedBy      User @relation(fields: [recordedById], references: [id])
+
+  @@index([rinkId])
+  @@index([recordedAt])
+}
+
+enum ReadingStatus {
+  RECORDED
+  ANALYZED
+  FLAGGED
+  ARCHIVED
+}
+
+// ============================================
+// MODULE 2: ICE OPERATIONS
+// ============================================
+
+model IceMakeLog {
+  id              String   @id @default(cuid())
+  rinkId          String
+  loggedById      String
+
+  startTime       DateTime
+  endTime         DateTime?
+
+  // Ice make details
+  waterTemp       Float?
+  floodCount      Int      @default(1)
+  iceThickness    Float?   // inches added
+
+  notes           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  rink            Rink     @relation(fields: [rinkId], references: [id], onDelete: Cascade)
+
+  @@index([rinkId])
+  @@index([startTime])
+}
+
+model ZamboniLog {
+  id              String   @id @default(cuid())
+  rinkId          String
+  equipmentId     String
+  operatorId      String
+
+  // Circle check items
+  checkTime       DateTime @default(now())
+  oilLevel        CheckStatus @default(OK)
+  waterLevel      CheckStatus @default(OK)
+  bladesCondition CheckStatus @default(OK)
+  towelCondition  CheckStatus @default(OK)
+  tiresCondition  CheckStatus @default(OK)
+  lightsWorking   Boolean     @default(true)
+  hornWorking     Boolean     @default(true)
+
+  // Usage
+  hoursAtCheck    Float?
+  fuelLevel       Float?   // percentage
+
+  // Issues
+  issuesFound     String?
+  maintenanceNeeded Boolean @default(false)
+
+  notes           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  rink            Rink      @relation(fields: [rinkId], references: [id])
+  equipment       Equipment @relation(fields: [equipmentId], references: [id])
+
+  @@index([rinkId])
+  @@index([equipmentId])
+  @@index([checkTime])
+}
+
+enum CheckStatus {
+  OK
+  LOW
+  NEEDS_ATTENTION
+  CRITICAL
+}
+
+model BladeChangeLog {
+  id              String   @id @default(cuid())
+  equipmentId     String
+  changedById     String
+
+  changeTime      DateTime @default(now())
+  hoursOnOldBlade Float
+  bladeType       String?
+  reason          BladeChangeReason @default(SCHEDULED)
+
+  notes           String?
+
+  createdAt       DateTime @default(now())
+
+  equipment       Equipment @relation(fields: [equipmentId], references: [id])
+
+  @@index([equipmentId])
+  @@index([changeTime])
+}
+
+enum BladeChangeReason {
+  SCHEDULED
+  DAMAGE
+  PERFORMANCE
+  OTHER
+}
+
+// ============================================
+// MODULE 3: INCIDENT REPORTING
+// ============================================
+
+enum SeverityLevel {
+  MINOR       // First aid only
+  MODERATE    // Medical attention needed
+  SERIOUS     // Emergency services called
+  CRITICAL    // Life-threatening
+}
+
+model IncidentReport {
+  id              String        @id @default(cuid())
+  facilityId      String
+  reportedById    String
+
+  // Incident details
+  incidentTime    DateTime
+  location        String
+  incidentType    String
+  description     String        @db.Text
+
+  // Severity
+  severityLevel   SeverityLevel @default(MINOR)
+  ambulanceCalled Boolean       @default(false)
+
+  // Injured party
+  injuredName     String?
+  injuredContact  String?
+  injuredAge      Int?
+
+  // Body diagram data
+  bodyDiagramData Json?         // { injuries: [{ bodyPart, x, y, description }] }
+
+  // Witnesses
+  witnesses       Json?         // Array of { name, contact }
+
+  // Follow-up
+  status          IncidentStatus @default(OPEN)
+  followUpNotes   String?
+  resolvedAt      DateTime?
+
+  // Notifications sent
+  gmNotified      Boolean       @default(false)
+  gmNotifiedAt    DateTime?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  facility        Facility      @relation(fields: [facilityId], references: [id])
+  reportedBy      User          @relation(fields: [reportedById], references: [id])
+  attachments     Attachment[]
+
+  @@index([facilityId])
+  @@index([incidentTime])
+  @@index([severityLevel])
+}
+
+enum IncidentStatus {
+  OPEN
+  UNDER_INVESTIGATION
+  RESOLVED
+  CLOSED
+}
+
+// ============================================
+// MODULE 4: REFRIGERATION ROOM LOGS
+// ============================================
+
+model RefrigerationLog {
+  id              String   @id @default(cuid())
+  facilityId      String
+  recordedById    String
+
+  recordedAt      DateTime @default(now())
+
+  // Compressor readings
+  compressor1Suction Float?
+  compressor1Discharge Float?
+  compressor2Suction Float?
+  compressor2Discharge Float?
+
+  // Temperature readings
+  brineSupply     Float?
+  brineReturn     Float?
+  condenserIn     Float?
+  condenserOut    Float?
+
+  // Other readings
+  oilPressure     Float?
+  oilLevel        CheckStatus?
+  refrigerantLevel CheckStatus?
+
+  // Alerts
+  alarmsPresent   Boolean  @default(false)
+  alarmDetails    String?
+
+  notes           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([facilityId])
+  @@index([recordedAt])
+}
+
+// ============================================
+// MODULE 5: AIR QUALITY MONITORING
+// ============================================
+
+model AirQualityLog {
+  id              String   @id @default(cuid())
+  facilityId      String
+  recordedById    String
+  location        String   // Specific location in facility
+
+  recordedAt      DateTime @default(now())
+
+  // Readings
+  co2Level        Float?   // ppm
+  temperature     Float?   // Fahrenheit
+  humidity        Float?   // percentage
+  coLevel         Float?   // Carbon monoxide ppm
+
+  // Thresholds exceeded
+  thresholdExceeded Boolean @default(false)
+  alertSent       Boolean  @default(false)
+
+  notes           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([facilityId])
+  @@index([recordedAt])
+}
+
+// ============================================
+// MODULE 6: EMPLOYEE SCHEDULING
+// ============================================
+
+model Schedule {
+  id              String   @id @default(cuid())
+  facilityId      String
+  name            String   // e.g., "Week of Dec 9"
+  startDate       DateTime
+  endDate         DateTime
+  status          ScheduleStatus @default(DRAFT)
+  publishedAt     DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  facility        Facility       @relation(fields: [facilityId], references: [id])
+  shifts          ScheduleShift[]
+  templates       ShiftTemplate[]
+
+  @@index([facilityId])
+  @@index([startDate])
+}
+
+enum ScheduleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model ScheduleShift {
+  id              String   @id @default(cuid())
+  scheduleId      String
+  userId          String
+
+  shiftDate       DateTime
+  startTime       DateTime
+  endTime         DateTime
+
+  position        String?  // Role/position for this shift
+  notes           String?
+
+  // Status
+  status          ShiftStatus @default(SCHEDULED)
+  clockInTime     DateTime?
+  clockOutTime    DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  schedule        Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@index([scheduleId])
+  @@index([userId])
+  @@index([shiftDate])
+}
+
+enum ShiftStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+model ShiftTemplate {
+  id              String   @id @default(cuid())
+  scheduleId      String?
+  facilityId      String
+  name            String
+
+  dayOfWeek       Int      // 0-6, Sunday = 0
+  startTime       String   // "HH:mm"
+  endTime         String   // "HH:mm"
+  position        String?
+
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  schedule        Schedule? @relation(fields: [scheduleId], references: [id])
+
+  @@index([facilityId])
+}
+
+model TimeOffRequest {
+  id              String   @id @default(cuid())
+  userId          String
+
+  startDate       DateTime
+  endDate         DateTime
+  reason          String?
+
+  status          TimeOffStatus @default(PENDING)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  reviewNotes     String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([startDate])
+}
+
+enum TimeOffStatus {
+  PENDING
+  APPROVED
+  DENIED
+  CANCELLED
+}
+
+// ============================================
+// MODULE 7: FACILITY CHECKLISTS / SOPs
+// ============================================
+
+enum ChecklistCategory {
+  OPENING
+  CLOSING
+  SAFETY
+  MAINTENANCE
+  CLEANING
+  CUSTOM
+}
+
+model Checklist {
+  id              String           @id @default(cuid())
+  facilityId      String
+  name            String
+  description     String?
+  category        ChecklistCategory
+  isActive        Boolean          @default(true)
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  facility        Facility         @relation(fields: [facilityId], references: [id])
+  items           ChecklistItem[]
+  completions     ChecklistCompletion[]
+
+  @@index([facilityId])
+  @@index([category])
+}
+
+model ChecklistItem {
+  id              String   @id @default(cuid())
+  checklistId     String
+
+  label           String
+  description     String?
+  orderIndex      Int
+  isRequired      Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  checklist       Checklist           @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  completionItems ChecklistCompletionItem[]
+
+  @@index([checklistId])
+  @@index([orderIndex])
+}
+
+model ChecklistCompletion {
+  id              String   @id @default(cuid())
+  checklistId     String
+  completedById   String
+
+  completedAt     DateTime @default(now())
+  notes           String?
+
+  createdAt       DateTime @default(now())
+
+  checklist       Checklist              @relation(fields: [checklistId], references: [id])
+  items           ChecklistCompletionItem[]
+
+  @@index([checklistId])
+  @@index([completedAt])
+}
+
+model ChecklistCompletionItem {
+  id                     String   @id @default(cuid())
+  checklistCompletionId  String
+  checklistItemId        String
+
+  isCompleted            Boolean  @default(false)
+  completedAt            DateTime?
+  notes                  String?
+
+  checklistCompletion    ChecklistCompletion @relation(fields: [checklistCompletionId], references: [id], onDelete: Cascade)
+  checklistItem          ChecklistItem       @relation(fields: [checklistItemId], references: [id])
+
+  @@index([checklistCompletionId])
+}
+
+// ============================================
+// EQUIPMENT MANAGEMENT
+// ============================================
+
+enum EquipmentType {
+  ZAMBONI
+  OLYMPIA
+  EDGER
+  COMPRESSOR
+  DEHUMIDIFIER
+  OTHER
+}
+
+model Equipment {
+  id              String        @id @default(cuid())
+  facilityId      String
+
+  name            String
+  equipmentType   EquipmentType
+  manufacturer    String?
+  model           String?
+  serialNumber    String?
+
+  purchaseDate    DateTime?
+  warrantyExpires DateTime?
+
+  // Usage tracking
+  currentHours    Float         @default(0)
+  lastServiceHours Float?
+  nextServiceHours Float?
+
+  isActive        Boolean       @default(true)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  facility        Facility      @relation(fields: [facilityId], references: [id])
+  zamboniLogs     ZamboniLog[]
+  bladeChanges    BladeChangeLog[]
+
+  @@index([facilityId])
+  @@index([equipmentType])
+}
+
+// ============================================
+// NOTIFICATIONS & ALERTS
+// ============================================
+
+enum NotificationType {
+  INFO
+  WARNING
+  ALERT
+  INCIDENT
+  SCHEDULE
+  SYSTEM
+}
+
+model Notification {
+  id              String           @id @default(cuid())
+  userId          String
+
+  type            NotificationType
+  title           String
+  message         String
+  link            String?          // Deep link to related item
+
+  isRead          Boolean          @default(false)
+  readAt          DateTime?
+
+  createdAt       DateTime         @default(now())
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model Alert {
+  id              String   @id @default(cuid())
+  facilityId      String
+
+  alertType       String   // e.g., "CO2_HIGH", "ICE_THIN"
+  severity        SeverityLevel
+  message         String
+  threshold       Float?
+  actualValue     Float?
+
+  isAcknowledged  Boolean  @default(false)
+  acknowledgedById String?
+  acknowledgedAt  DateTime?
+
+  createdAt       DateTime @default(now())
+
+  facility        Facility @relation(fields: [facilityId], references: [id])
+
+  @@index([facilityId])
+  @@index([isAcknowledged])
+  @@index([createdAt])
+}
+
+// ============================================
+// WEATHER INTEGRATION
+// ============================================
+
+model WeatherCache {
+  id              String   @id @default(cuid())
+  facilityId      String   @unique
+
+  temperature     Float    // Fahrenheit
+  humidity        Float    // Percentage
+  conditions      String   // e.g., "Cloudy"
+  icon            String?  // Weather icon code
+
+  fetchedAt       DateTime @default(now())
+  expiresAt       DateTime
+
+  facility        Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+// ============================================
+// BILLING & SUBSCRIPTIONS
+// ============================================
+
+enum SubscriptionTier {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  TRIALING
+}
+
+model Subscription {
+  id               String             @id @default(cuid())
+  organizationId   String             @unique
+
+  tier             SubscriptionTier   @default(FREE)
+  status           SubscriptionStatus @default(TRIALING)
+
+  maxFacilities    Int                @default(1)
+  maxUsersPerFacility Int             @default(5)
+
+  trialEndsAt      DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd DateTime?
+
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+// ============================================
+// AUDIT LOGGING
+// ============================================
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  userId          String?
+
+  action          String   // e.g., "CREATE", "UPDATE", "DELETE"
+  entityType      String   // e.g., "FormSubmission", "User"
+  entityId        String
+
+  oldValues       Json?
+  newValues       Json?
+
+  ipAddress       String?
+  userAgent       String?
+
+  createdAt       DateTime @default(now())
+
+  user            User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}

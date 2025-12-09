@@ -1,0 +1,1 @@
+export { BodyDiagram } from './BodyDiagram';
