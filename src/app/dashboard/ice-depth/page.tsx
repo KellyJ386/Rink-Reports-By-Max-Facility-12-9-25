@@ -5,6 +5,7 @@ import {
   ClockIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
+  BeakerIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
@@ -67,11 +68,18 @@ export default function IceDepthPage() {
             Track ice thickness with precision measurements and AI analysis
           </p>
         </div>
-        <Link href="/dashboard/ice-depth/new">
-          <Button leftIcon={<PlusIcon className="w-4 h-4" />}>
-            New Reading
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/ice-depth/analysis">
+            <Button variant="secondary" leftIcon={<BeakerIcon className="w-4 h-4" />}>
+              AI Analysis
+            </Button>
+          </Link>
+          <Link href="/dashboard/ice-depth/new">
+            <Button leftIcon={<PlusIcon className="w-4 h-4" />}>
+              New Reading
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Overview */}

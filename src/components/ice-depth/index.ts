@@ -1,2 +1,3 @@
-export { RinkDiagram, useIceDepthPoints, generatePoints } from './RinkDiagram';
-export { DepthInputPanel, DepthStats } from './DepthInputPanel';
+export { SPCChart } from './SPCChart';
+export { WeeklyComparisonChart } from './WeeklyComparisonChart';
+export { HeatmapVisualization } from './HeatmapVisualization';
