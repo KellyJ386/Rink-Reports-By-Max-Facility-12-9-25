@@ -106,3 +106,22 @@ export type {
   CreateAirQualityData,
   AirQualityAlert,
 } from './useAirQuality';
+
+// Refrigeration hooks
+export {
+  useRefrigerationReadings,
+  useRefrigerationReadingsLive,
+  useCreateRefrigerationReading,
+  checkRefrigerationStatus,
+  getEquipmentStatusColor,
+  isPressureInRange,
+  isBrineInRange,
+  REFRIGERATION_THRESHOLDS,
+} from './useRefrigeration';
+export type {
+  RefrigerationReading,
+  RefrigerationFilters,
+  RefrigerationResponse,
+  CreateRefrigerationData,
+  EquipmentStatus,
+} from './useRefrigeration';
