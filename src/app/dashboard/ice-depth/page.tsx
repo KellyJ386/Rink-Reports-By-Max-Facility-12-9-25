@@ -290,7 +290,7 @@ export default function IceDepthPage() {
               rinkSummary.map((rink) => (
                 <Link
                   key={rink.id}
-                  href={`/dashboard/ice-depth/new?rink=${encodeURIComponent(rink.name)}`}
+                  href={`/dashboard/ice-depth/new?rink=${encodeURIComponent(rink.name)}&rinkId=${rink.id}`}
                 >
                   <div className="p-4 border border-rink-200 rounded-lg hover:border-ice-300 hover:bg-ice-50 transition-colors cursor-pointer">
                     <div className="flex items-center justify-between">
