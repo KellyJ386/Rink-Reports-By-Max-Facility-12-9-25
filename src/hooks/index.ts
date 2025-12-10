@@ -125,3 +125,33 @@ export type {
   CreateRefrigerationData,
   EquipmentStatus,
 } from './useRefrigeration';
+
+// Reports hooks
+export {
+  useReports,
+  useReportsLive,
+  useReport,
+  useGenerateReport,
+  useScheduleReport,
+  useDeleteReport,
+  getReportStatusColor,
+  getReportTypeName,
+  getReportTypeColor,
+  formatFileSize,
+  formatTimeAgo,
+  getFrequencyText,
+  getReportTypeConfig,
+  REPORT_TYPES,
+} from './useReports';
+export type {
+  Report,
+  ReportType,
+  ReportFormat,
+  ReportStatus,
+  ScheduledReport,
+  GenerateReportInput,
+  CreateScheduledReportInput,
+  ReportFrequency,
+  ReportTypeConfig,
+  ReportParam,
+} from './useReports';
