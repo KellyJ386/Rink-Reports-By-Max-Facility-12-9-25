@@ -1,0 +1,171 @@
+{
+  "common": {
+    "appName": "Max Facility Operations",
+    "loading": "Cargando...",
+    "error": "Ocurrió un error",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "create": "Crear",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "export": "Exportar",
+    "import": "Importar",
+    "close": "Cerrar",
+    "confirm": "Confirmar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "submit": "Enviar",
+    "yes": "Sí",
+    "no": "No",
+    "all": "Todos",
+    "none": "Ninguno",
+    "select": "Seleccionar",
+    "required": "Requerido",
+    "optional": "Opcional"
+  },
+  "auth": {
+    "signIn": "Iniciar Sesión",
+    "signOut": "Cerrar Sesión",
+    "signUp": "Registrarse",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "forgotPassword": "¿Olvidó su contraseña?",
+    "resetPassword": "Restablecer Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "rememberMe": "Recordarme",
+    "invalidCredentials": "Correo o contraseña inválidos",
+    "sessionExpired": "Su sesión ha expirado. Por favor inicie sesión nuevamente."
+  },
+  "navigation": {
+    "dashboard": "Panel Principal",
+    "incidents": "Incidentes",
+    "iceDepth": "Profundidad del Hielo",
+    "schedule": "Horarios",
+    "forms": "Formularios",
+    "reports": "Informes",
+    "settings": "Configuración",
+    "help": "Ayuda"
+  },
+  "dashboard": {
+    "title": "Panel Principal",
+    "welcome": "Bienvenido, {{name}}",
+    "overview": "Resumen",
+    "recentActivity": "Actividad Reciente",
+    "alerts": "Alertas Activas",
+    "stats": {
+      "formsSubmitted": "Formularios Enviados",
+      "iceReadings": "Lecturas de Hielo",
+      "openIncidents": "Incidentes Abiertos",
+      "scheduledShifts": "Turnos Programados"
+    }
+  },
+  "incidents": {
+    "title": "Incidentes",
+    "newIncident": "Nuevo Incidente",
+    "reportIncident": "Reportar Incidente",
+    "incidentType": "Tipo de Incidente",
+    "severity": "Gravedad",
+    "location": "Ubicación",
+    "description": "Descripción",
+    "status": "Estado",
+    "reportedBy": "Reportado Por",
+    "reportedAt": "Reportado El",
+    "noIncidents": "No se encontraron incidentes",
+    "severityLevels": {
+      "minor": "Menor",
+      "moderate": "Moderado",
+      "serious": "Grave",
+      "critical": "Crítico"
+    },
+    "statusTypes": {
+      "reported": "Reportado",
+      "investigating": "En Investigación",
+      "resolved": "Resuelto",
+      "closed": "Cerrado"
+    },
+    "types": {
+      "injury": "Lesión",
+      "equipment": "Falla de Equipo",
+      "ice": "Condición del Hielo",
+      "facility": "Problema de Instalación",
+      "other": "Otro"
+    }
+  },
+  "iceDepth": {
+    "title": "Análisis de Profundidad del Hielo",
+    "newReading": "Nueva Lectura",
+    "readings": "Lecturas",
+    "analysis": "Análisis",
+    "depth": "Profundidad",
+    "averageDepth": "Profundidad Promedio",
+    "minDepth": "Profundidad Mínima",
+    "maxDepth": "Profundidad Máxima",
+    "temperature": "Temperatura",
+    "humidity": "Humedad",
+    "noReadings": "No se encontraron lecturas",
+    "selectRink": "Seleccionar Pista"
+  },
+  "schedule": {
+    "title": "Horario del Personal",
+    "addShift": "Agregar Turno",
+    "editShift": "Editar Turno",
+    "employee": "Empleado",
+    "startTime": "Hora de Inicio",
+    "endTime": "Hora de Fin",
+    "position": "Posición",
+    "notes": "Notas",
+    "noShifts": "No hay turnos programados"
+  },
+  "forms": {
+    "title": "Formularios",
+    "newSubmission": "Nueva Presentación",
+    "formType": "Tipo de Formulario",
+    "submittedBy": "Enviado Por",
+    "submittedAt": "Enviado El",
+    "status": "Estado",
+    "noSubmissions": "No se encontraron presentaciones"
+  },
+  "settings": {
+    "title": "Configuración",
+    "general": "General",
+    "profile": "Perfil",
+    "notifications": "Notificaciones",
+    "security": "Seguridad",
+    "appearance": "Apariencia",
+    "language": "Idioma",
+    "theme": "Tema",
+    "themes": {
+      "light": "Claro",
+      "dark": "Oscuro",
+      "system": "Sistema"
+    }
+  },
+  "errors": {
+    "generic": "Algo salió mal. Por favor intente de nuevo.",
+    "notFound": "Página no encontrada",
+    "unauthorized": "No está autorizado para ver esta página",
+    "forbidden": "Acceso denegado",
+    "validation": "Por favor verifique su entrada e intente de nuevo",
+    "network": "Error de red. Por favor verifique su conexión."
+  },
+  "validation": {
+    "required": "Este campo es requerido",
+    "email": "Por favor ingrese un correo electrónico válido",
+    "minLength": "Debe tener al menos {{min}} caracteres",
+    "maxLength": "Debe tener no más de {{max}} caracteres",
+    "min": "Debe ser al menos {{min}}",
+    "max": "Debe ser no más de {{max}}",
+    "pattern": "Formato inválido"
+  },
+  "time": {
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "thisWeek": "Esta Semana",
+    "lastWeek": "Semana Pasada",
+    "thisMonth": "Este Mes",
+    "lastMonth": "Mes Pasado"
+  }
+}
