@@ -86,3 +86,23 @@ export {
   formatShortcut,
 } from './useKeyboardShortcuts';
 export type { Shortcut } from './useKeyboardShortcuts';
+
+// Air Quality hooks
+export {
+  useAirQualityReadings,
+  useAirQualityReadingsLive,
+  useCreateAirQualityReading,
+  useLatestReadingsByLocation,
+  useThresholdAlerts,
+  checkThresholds,
+  getCO2Status,
+  getCOStatus,
+  AIR_QUALITY_THRESHOLDS,
+} from './useAirQuality';
+export type {
+  AirQualityReading,
+  AirQualityFilters,
+  AirQualityResponse,
+  CreateAirQualityData,
+  AirQualityAlert,
+} from './useAirQuality';
