@@ -155,3 +155,41 @@ export type {
   ReportTypeConfig,
   ReportParam,
 } from './useReports';
+
+// Admin hooks
+export {
+  useUsers,
+  useUsersLive,
+  useCreateUser,
+  useUpdateUser,
+  useFacilities,
+  useFacilitiesLive,
+  useCreateFacility,
+  useUpdateFacility,
+  useAuditLogs,
+  useAuditLogsLive,
+  getRoleLabel,
+  getRoleColor,
+  getAuditActionColor,
+  getSeverityColor,
+  formatUserInitials,
+  getUserFacilities,
+  ROLE_LABELS,
+  ROLE_COLORS,
+  AUDIT_ACTION_COLORS,
+  SEVERITY_CONFIG,
+} from './useAdmin';
+export type {
+  AdminUser,
+  UserRole,
+  CreateUserInput,
+  UpdateUserInput,
+  Facility,
+  CreateFacilityInput,
+  UpdateFacilityInput,
+  AuditLogEntry,
+  AuditAction,
+  AuditSeverity,
+  AuditStats,
+  AuditLogFilter,
+} from './useAdmin';
