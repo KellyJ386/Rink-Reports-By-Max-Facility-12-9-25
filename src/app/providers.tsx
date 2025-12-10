@@ -1,28 +1,21 @@
 'use client';
 
 import { SessionProvider } from 'next-auth/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { useState, type ReactNode, Suspense } from 'react';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { HelpProvider } from '@/components/ui/HelpSystem';
+import { WebVitals } from '@/components/providers/WebVitals';
+import { createQueryClient } from '@/lib/queryClient';
 
 interface ProvidersProps {
   children: ReactNode;
 }
 
 export function Providers({ children }: ProvidersProps) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 60 * 1000, // 1 minute
-            refetchOnWindowFocus: false,
-            retry: 1,
-          },
-        },
-      })
-  );
+  // Create query client with optimized configuration
+  const [queryClient] = useState(() => createQueryClient());
 
   return (
     <SessionProvider>
@@ -32,6 +25,13 @@ export function Providers({ children }: ProvidersProps) {
             {children}
           </HelpProvider>
         </ThemeProvider>
+        {/* Performance monitoring */}
+        <Suspense fallback={null}>
+          <WebVitals />
+        </Suspense>
+        {process.env.NODE_ENV === 'development' && (
+          <ReactQueryDevtools initialIsOpen={false} position="bottom" />
+        )}
       </QueryClientProvider>
     </SessionProvider>
   );
