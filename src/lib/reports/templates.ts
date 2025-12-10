@@ -1,0 +1,335 @@
+// Pre-defined Report Templates
+
+import type { ReportTemplate } from './types';
+
+export const reportTemplates: ReportTemplate[] = [
+  {
+    id: 'incident-summary',
+    name: 'Incident Summary Report',
+    type: 'incident_summary',
+    description: 'Comprehensive overview of all incidents within a specified period',
+    sections: [
+      {
+        id: 'overview',
+        name: 'Executive Summary',
+        type: 'summary',
+        config: { metrics: ['total', 'resolved', 'pending', 'average_resolution_time'] },
+        order: 1,
+      },
+      {
+        id: 'by-type',
+        name: 'Incidents by Type',
+        type: 'chart',
+        config: { chartType: 'pie', groupBy: 'type' },
+        order: 2,
+      },
+      {
+        id: 'by-severity',
+        name: 'Incidents by Severity',
+        type: 'chart',
+        config: { chartType: 'bar', groupBy: 'severity' },
+        order: 3,
+      },
+      {
+        id: 'trends',
+        name: 'Incident Trends',
+        type: 'chart',
+        config: { chartType: 'line', groupBy: 'date' },
+        order: 4,
+      },
+      {
+        id: 'details',
+        name: 'Incident Details',
+        type: 'table',
+        config: {
+          columns: ['date', 'type', 'severity', 'location', 'status', 'resolution_time'],
+        },
+        order: 5,
+      },
+    ],
+    filters: [
+      { id: 'dateRange', name: 'Date Range', type: 'date_range', required: true },
+      { id: 'facility', name: 'Facility', type: 'facility', required: false },
+      { id: 'rink', name: 'Rink', type: 'rink', required: false },
+      {
+        id: 'severity',
+        name: 'Severity',
+        type: 'status',
+        required: false,
+        options: [
+          { label: 'Minor', value: 'MINOR' },
+          { label: 'Moderate', value: 'MODERATE' },
+          { label: 'Serious', value: 'SERIOUS' },
+          { label: 'Critical', value: 'CRITICAL' },
+        ],
+      },
+    ],
+    defaultFormat: 'pdf',
+    isSystem: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'ice-depth-analysis',
+    name: 'Ice Depth Analysis Report',
+    type: 'ice_depth_analysis',
+    description: 'Detailed analysis of ice depth readings and trends',
+    sections: [
+      {
+        id: 'overview',
+        name: 'Summary',
+        type: 'metrics',
+        config: { metrics: ['average_depth', 'min_depth', 'max_depth', 'readings_count', 'alerts_count'] },
+        order: 1,
+      },
+      {
+        id: 'trends',
+        name: 'Depth Trends Over Time',
+        type: 'chart',
+        config: { chartType: 'line', metric: 'average_depth' },
+        order: 2,
+      },
+      {
+        id: 'heatmap',
+        name: 'Ice Surface Heatmap',
+        type: 'chart',
+        config: { chartType: 'heatmap', metric: 'depth' },
+        order: 3,
+      },
+      {
+        id: 'by-rink',
+        name: 'Comparison by Rink',
+        type: 'chart',
+        config: { chartType: 'bar', groupBy: 'rink' },
+        order: 4,
+      },
+      {
+        id: 'alerts',
+        name: 'Depth Alerts',
+        type: 'table',
+        config: { columns: ['date', 'rink', 'location', 'depth', 'threshold', 'action_taken'] },
+        order: 5,
+      },
+    ],
+    filters: [
+      { id: 'dateRange', name: 'Date Range', type: 'date_range', required: true },
+      { id: 'facility', name: 'Facility', type: 'facility', required: false },
+      { id: 'rink', name: 'Rink', type: 'rink', required: false },
+    ],
+    defaultFormat: 'pdf',
+    isSystem: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'staff-schedule',
+    name: 'Staff Schedule Report',
+    type: 'staff_schedule',
+    description: 'Staff scheduling overview with hours worked and coverage analysis',
+    sections: [
+      {
+        id: 'summary',
+        name: 'Hours Summary',
+        type: 'metrics',
+        config: { metrics: ['total_hours', 'overtime_hours', 'staff_count', 'shifts_count'] },
+        order: 1,
+      },
+      {
+        id: 'by-employee',
+        name: 'Hours by Employee',
+        type: 'table',
+        config: { columns: ['name', 'role', 'scheduled_hours', 'actual_hours', 'overtime'] },
+        order: 2,
+      },
+      {
+        id: 'coverage',
+        name: 'Coverage Analysis',
+        type: 'chart',
+        config: { chartType: 'area', metric: 'staff_on_duty' },
+        order: 3,
+      },
+      {
+        id: 'by-role',
+        name: 'Distribution by Role',
+        type: 'chart',
+        config: { chartType: 'pie', groupBy: 'role' },
+        order: 4,
+      },
+    ],
+    filters: [
+      { id: 'dateRange', name: 'Date Range', type: 'date_range', required: true },
+      { id: 'facility', name: 'Facility', type: 'facility', required: false },
+      { id: 'user', name: 'Staff Member', type: 'user', required: false },
+    ],
+    defaultFormat: 'excel',
+    isSystem: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'maintenance-log',
+    name: 'Maintenance Log Report',
+    type: 'maintenance_log',
+    description: 'Equipment maintenance history and upcoming tasks',
+    sections: [
+      {
+        id: 'summary',
+        name: 'Maintenance Summary',
+        type: 'metrics',
+        config: { metrics: ['completed_tasks', 'pending_tasks', 'overdue_tasks', 'equipment_count'] },
+        order: 1,
+      },
+      {
+        id: 'by-equipment',
+        name: 'Maintenance by Equipment',
+        type: 'table',
+        config: { columns: ['equipment', 'last_maintenance', 'next_due', 'status', 'technician'] },
+        order: 2,
+      },
+      {
+        id: 'history',
+        name: 'Maintenance History',
+        type: 'table',
+        config: { columns: ['date', 'equipment', 'type', 'description', 'technician', 'duration'] },
+        order: 3,
+      },
+      {
+        id: 'costs',
+        name: 'Maintenance Costs',
+        type: 'chart',
+        config: { chartType: 'bar', metric: 'cost', groupBy: 'equipment' },
+        order: 4,
+      },
+    ],
+    filters: [
+      { id: 'dateRange', name: 'Date Range', type: 'date_range', required: true },
+      { id: 'facility', name: 'Facility', type: 'facility', required: false },
+      {
+        id: 'status',
+        name: 'Status',
+        type: 'status',
+        required: false,
+        options: [
+          { label: 'Completed', value: 'completed' },
+          { label: 'Pending', value: 'pending' },
+          { label: 'Overdue', value: 'overdue' },
+        ],
+      },
+    ],
+    defaultFormat: 'pdf',
+    isSystem: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'facility-overview',
+    name: 'Facility Overview Report',
+    type: 'facility_overview',
+    description: 'Comprehensive facility performance and status report',
+    sections: [
+      {
+        id: 'kpis',
+        name: 'Key Performance Indicators',
+        type: 'metrics',
+        config: {
+          metrics: [
+            'ice_quality_score',
+            'incident_rate',
+            'staff_utilization',
+            'maintenance_compliance',
+            'energy_efficiency',
+          ],
+        },
+        order: 1,
+      },
+      {
+        id: 'incidents',
+        name: 'Incident Overview',
+        type: 'summary',
+        config: { compact: true },
+        order: 2,
+      },
+      {
+        id: 'ice-status',
+        name: 'Ice Status',
+        type: 'summary',
+        config: { compact: true },
+        order: 3,
+      },
+      {
+        id: 'schedule',
+        name: 'Schedule Summary',
+        type: 'summary',
+        config: { compact: true },
+        order: 4,
+      },
+      {
+        id: 'trends',
+        name: 'Performance Trends',
+        type: 'chart',
+        config: { chartType: 'line', metrics: ['ice_quality', 'incidents', 'uptime'] },
+        order: 5,
+      },
+    ],
+    filters: [
+      { id: 'dateRange', name: 'Date Range', type: 'date_range', required: true },
+      { id: 'facility', name: 'Facility', type: 'facility', required: true },
+    ],
+    defaultFormat: 'pdf',
+    isSystem: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'compliance',
+    name: 'Compliance Report',
+    type: 'compliance',
+    description: 'Regulatory compliance and safety checklist status',
+    sections: [
+      {
+        id: 'overview',
+        name: 'Compliance Score',
+        type: 'metrics',
+        config: { metrics: ['overall_score', 'completed_checks', 'pending_checks', 'overdue_checks'] },
+        order: 1,
+      },
+      {
+        id: 'by-category',
+        name: 'Compliance by Category',
+        type: 'chart',
+        config: { chartType: 'radar', groupBy: 'category' },
+        order: 2,
+      },
+      {
+        id: 'checklist',
+        name: 'Compliance Checklist',
+        type: 'table',
+        config: { columns: ['item', 'category', 'last_checked', 'status', 'next_due', 'assigned_to'] },
+        order: 3,
+      },
+      {
+        id: 'issues',
+        name: 'Outstanding Issues',
+        type: 'table',
+        config: { columns: ['issue', 'category', 'severity', 'identified_date', 'resolution_plan'] },
+        order: 4,
+      },
+    ],
+    filters: [
+      { id: 'dateRange', name: 'Date Range', type: 'date_range', required: true },
+      { id: 'facility', name: 'Facility', type: 'facility', required: false },
+    ],
+    defaultFormat: 'pdf',
+    isSystem: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+];
+
+export function getTemplate(id: string): ReportTemplate | undefined {
+  return reportTemplates.find((t) => t.id === id);
+}
+
+export function getTemplatesByType(type: string): ReportTemplate[] {
+  return reportTemplates.filter((t) => t.type === type);
+}
