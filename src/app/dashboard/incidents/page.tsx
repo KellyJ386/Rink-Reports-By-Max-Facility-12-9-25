@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
+import { useIncidents } from '@/hooks';
 import {
   ExclamationTriangleIcon,
   PlusIcon,
@@ -12,60 +13,17 @@ import {
   PhoneIcon,
   ClockIcon,
   UserIcon,
+  FunnelIcon,
+  ArrowDownTrayIcon,
+  MagnifyingGlassIcon,
+  ChartBarIcon,
+  CalendarDaysIcon,
+  MapPinIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
 } from '@heroicons/react/24/outline';
-import { format } from 'date-fns';
-
-interface Incident {
-  id: string;
-  incidentTime: string;
-  location: string;
-  incidentType: string;
-  description: string;
-  severityLevel: 'MINOR' | 'MODERATE' | 'SERIOUS' | 'CRITICAL';
-  ambulanceCalled: boolean;
-  injuredName?: string;
-  status: 'OPEN' | 'UNDER_INVESTIGATION' | 'RESOLVED' | 'CLOSED';
-  reportedBy: string;
-}
-
-// Mock data
-const mockIncidents: Incident[] = [
-  {
-    id: '1',
-    incidentTime: new Date(Date.now() - 3600000).toISOString(),
-    location: 'Rink A - Center Ice',
-    incidentType: 'Player Collision',
-    description: 'Two players collided during hockey practice. One player complained of wrist pain.',
-    severityLevel: 'MODERATE',
-    ambulanceCalled: false,
-    injuredName: 'Michael Johnson',
-    status: 'OPEN',
-    reportedBy: 'Sarah Wilson',
-  },
-  {
-    id: '2',
-    incidentTime: new Date(Date.now() - 86400000).toISOString(),
-    location: 'Lobby - Near Entrance',
-    incidentType: 'Slip and Fall',
-    description: 'Patron slipped on wet floor near entrance. Minor bruise on knee.',
-    severityLevel: 'MINOR',
-    ambulanceCalled: false,
-    status: 'RESOLVED',
-    reportedBy: 'John Smith',
-  },
-  {
-    id: '3',
-    incidentTime: new Date(Date.now() - 172800000).toISOString(),
-    location: 'Rink B - Goal Crease',
-    incidentType: 'Goalie Injury',
-    description: 'Goalie took puck to face mask, complained of neck pain. EMS called for evaluation.',
-    severityLevel: 'SERIOUS',
-    ambulanceCalled: true,
-    injuredName: 'Emily Davis',
-    status: 'UNDER_INVESTIGATION',
-    reportedBy: 'Mike Wilson',
-  },
-];
+import { format, subDays, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import clsx from 'clsx';
 
 const severityColors: Record<string, string> = {
   MINOR: 'bg-green-100 text-green-800 border-green-200',
@@ -75,26 +33,175 @@ const severityColors: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-  OPEN: 'bg-blue-100 text-blue-800',
-  UNDER_INVESTIGATION: 'bg-yellow-100 text-yellow-800',
+  REPORTED: 'bg-blue-100 text-blue-800',
+  INVESTIGATING: 'bg-yellow-100 text-yellow-800',
   RESOLVED: 'bg-green-100 text-green-800',
-  CLOSED: 'bg-rink-100 text-rink-600',
+  CLOSED: 'bg-gray-100 text-gray-600',
+};
+
+const statusLabels: Record<string, string> = {
+  REPORTED: 'Reported',
+  INVESTIGATING: 'Investigating',
+  RESOLVED: 'Resolved',
+  CLOSED: 'Closed',
 };
 
 export default function IncidentsPage() {
-  const [incidents] = useState<Incident[]>(mockIncidents);
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterDateRange, setFilterDateRange] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
-  const filteredIncidents = incidents.filter((incident) => {
-    if (filterSeverity !== 'all' && incident.severityLevel !== filterSeverity) return false;
-    if (filterStatus !== 'all' && incident.status !== filterStatus) return false;
-    return true;
+  // Fetch incidents using real API
+  const { data: incidents = [], isLoading, error } = useIncidents({
+    ...(filterSeverity !== 'all' && { severity: filterSeverity }),
+    ...(filterStatus !== 'all' && { status: filterStatus }),
   });
 
-  const openCount = incidents.filter((i) => i.status === 'OPEN').length;
-  const seriousCount = incidents.filter((i) => ['SERIOUS', 'CRITICAL'].includes(i.severityLevel)).length;
-  const ambulanceCount = incidents.filter((i) => i.ambulanceCalled).length;
+  // Filter incidents locally for search and date range
+  const filteredIncidents = useMemo(() => {
+    let result = [...incidents];
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (incident) =>
+          incident.incidentType?.toLowerCase().includes(query) ||
+          incident.description?.toLowerCase().includes(query) ||
+          incident.location?.toLowerCase().includes(query)
+      );
+    }
+
+    // Date range filter
+    if (filterDateRange !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+
+      switch (filterDateRange) {
+        case 'today':
+          startDate = new Date(now.setHours(0, 0, 0, 0));
+          break;
+        case 'week':
+          startDate = subDays(now, 7);
+          break;
+        case 'month':
+          startDate = startOfMonth(now);
+          break;
+        case 'quarter':
+          startDate = subDays(now, 90);
+          break;
+        default:
+          startDate = new Date(0);
+      }
+
+      result = result.filter((incident) => {
+        const incidentDate = new Date(incident.occurredAt || incident.reportedAt);
+        return incidentDate >= startDate;
+      });
+    }
+
+    return result;
+  }, [incidents, searchQuery, filterDateRange]);
+
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const now = new Date();
+    const thisMonth = incidents.filter((i) => {
+      const date = new Date(i.occurredAt || i.reportedAt);
+      return isWithinInterval(date, {
+        start: startOfMonth(now),
+        end: endOfMonth(now),
+      });
+    });
+
+    const lastMonth = incidents.filter((i) => {
+      const date = new Date(i.occurredAt || i.reportedAt);
+      const lastMonthStart = startOfMonth(subDays(startOfMonth(now), 1));
+      const lastMonthEnd = endOfMonth(lastMonthStart);
+      return isWithinInterval(date, { start: lastMonthStart, end: lastMonthEnd });
+    });
+
+    const openCount = incidents.filter(
+      (i) => i.status === 'REPORTED' || i.status === 'INVESTIGATING'
+    ).length;
+
+    const seriousCount = incidents.filter((i) =>
+      ['SERIOUS', 'CRITICAL'].includes(i.severity)
+    ).length;
+
+    const ambulanceCount = incidents.filter(
+      (i) => (i.injuryDetails as Record<string, unknown>)?.ambulanceCalled
+    ).length;
+
+    const trend =
+      lastMonth.length > 0
+        ? ((thisMonth.length - lastMonth.length) / lastMonth.length) * 100
+        : 0;
+
+    return {
+      openCount,
+      seriousCount,
+      ambulanceCount,
+      totalThisMonth: thisMonth.length,
+      trend: Math.round(trend),
+    };
+  }, [incidents]);
+
+  // Get incident type breakdown
+  const typeBreakdown = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredIncidents.forEach((i) => {
+      const type = i.incidentType || 'Unknown';
+      counts[type] = (counts[type] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+  }, [filteredIncidents]);
+
+  // Export to CSV
+  const handleExport = () => {
+    const headers = [
+      'ID',
+      'Date',
+      'Type',
+      'Location',
+      'Severity',
+      'Status',
+      'Description',
+    ];
+    const rows = filteredIncidents.map((i) => [
+      i.id,
+      format(new Date(i.occurredAt), 'yyyy-MM-dd HH:mm'),
+      i.incidentType,
+      i.location,
+      i.severity,
+      i.status,
+      `"${i.description?.replace(/"/g, '""')}"`,
+    ]);
+
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `incidents-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+  };
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <ExclamationTriangleIcon className="w-16 h-16 mx-auto text-red-400 mb-4" />
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          Failed to Load Incidents
+        </h2>
+        <p className="text-gray-500">Please try refreshing the page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -106,148 +213,306 @@ export default function IncidentsPage() {
             Document and track safety incidents across your facility.
           </p>
         </div>
-        <Link href="/dashboard/incidents/new">
-          <Button leftIcon={<PlusIcon className="w-4 h-4" />}>
-            Report Incident
+        <div className="flex items-center gap-3">
+          <Button variant="secondary" onClick={handleExport}>
+            <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
+            Export
           </Button>
-        </Link>
+          <Link href="/dashboard/incidents/new">
+            <Button leftIcon={<PlusIcon className="w-4 h-4" />}>
+              Report Incident
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="flex items-center gap-4">
           <div className="p-3 bg-blue-100 rounded-lg">
             <ExclamationTriangleIcon className="w-6 h-6 text-blue-600" />
           </div>
           <div>
-            <p className="text-2xl font-bold text-rink-900">{openCount}</p>
-            <p className="text-sm text-rink-500">Open Incidents</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.openCount}</p>
+            <p className="text-sm text-gray-500">Open Incidents</p>
           </div>
         </Card>
+
         <Card className="flex items-center gap-4">
           <div className="p-3 bg-orange-100 rounded-lg">
             <ExclamationTriangleIcon className="w-6 h-6 text-orange-600" />
           </div>
           <div>
-            <p className="text-2xl font-bold text-rink-900">{seriousCount}</p>
-            <p className="text-sm text-rink-500">Serious/Critical</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.seriousCount}</p>
+            <p className="text-sm text-gray-500">Serious/Critical</p>
           </div>
         </Card>
+
         <Card className="flex items-center gap-4">
           <div className="p-3 bg-red-100 rounded-lg">
             <PhoneIcon className="w-6 h-6 text-red-600" />
           </div>
           <div>
-            <p className="text-2xl font-bold text-rink-900">{ambulanceCount}</p>
-            <p className="text-sm text-rink-500">EMS Called</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.ambulanceCount}</p>
+            <p className="text-sm text-gray-500">EMS Called</p>
           </div>
         </Card>
+
         <Card className="flex items-center gap-4">
-          <div className="p-3 bg-rink-100 rounded-lg">
-            <ClockIcon className="w-6 h-6 text-rink-600" />
+          <div className="p-3 bg-ice-100 rounded-lg">
+            <CalendarDaysIcon className="w-6 h-6 text-ice-600" />
           </div>
           <div>
-            <p className="text-2xl font-bold text-rink-900">{incidents.length}</p>
-            <p className="text-sm text-rink-500">Total This Month</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.totalThisMonth}</p>
+            <p className="text-sm text-gray-500">This Month</p>
+          </div>
+        </Card>
+
+        <Card className="flex items-center gap-4">
+          <div
+            className={clsx(
+              'p-3 rounded-lg',
+              stats.trend > 0 ? 'bg-red-100' : 'bg-green-100'
+            )}
+          >
+            {stats.trend > 0 ? (
+              <ArrowTrendingUpIcon className="w-6 h-6 text-red-600" />
+            ) : (
+              <ArrowTrendingDownIcon className="w-6 h-6 text-green-600" />
+            )}
+          </div>
+          <div>
+            <p
+              className={clsx(
+                'text-2xl font-bold',
+                stats.trend > 0 ? 'text-red-600' : 'text-green-600'
+              )}
+            >
+              {stats.trend > 0 ? '+' : ''}
+              {stats.trend}%
+            </p>
+            <p className="text-sm text-gray-500">vs Last Month</p>
           </div>
         </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4">
-        <div>
-          <label className="form-label">Severity</label>
-          <select
-            value={filterSeverity}
-            onChange={(e) => setFilterSeverity(e.target.value)}
-            className="form-input w-40"
-          >
-            <option value="all">All Severities</option>
-            <option value="MINOR">Minor</option>
-            <option value="MODERATE">Moderate</option>
-            <option value="SERIOUS">Serious</option>
-            <option value="CRITICAL">Critical</option>
-          </select>
+      {/* Type Breakdown Mini Chart */}
+      {typeBreakdown.length > 0 && (
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <ChartBarIcon className="w-5 h-5 text-gray-400" />
+              Top Incident Types
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {typeBreakdown.map(([type, count]) => (
+              <div key={type} className="flex items-center gap-4">
+                <div className="w-32 text-sm text-gray-600 truncate">{type}</div>
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-ice-500 rounded-full"
+                      style={{
+                        width: `${(count / filteredIncidents.length) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="w-12 text-sm font-medium text-gray-900 text-right">
+                  {count}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Search and Filters */}
+      <Card>
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Search */}
+          <div className="flex-1 relative">
+            <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search incidents..."
+              className="form-input pl-10 w-full"
+            />
+          </div>
+
+          {/* Quick Filters */}
+          <div className="flex flex-wrap gap-3">
+            <select
+              value={filterDateRange}
+              onChange={(e) => setFilterDateRange(e.target.value)}
+              className="form-input w-36"
+            >
+              <option value="all">All Time</option>
+              <option value="today">Today</option>
+              <option value="week">Last 7 Days</option>
+              <option value="month">This Month</option>
+              <option value="quarter">Last 90 Days</option>
+            </select>
+
+            <select
+              value={filterSeverity}
+              onChange={(e) => setFilterSeverity(e.target.value)}
+              className="form-input w-36"
+            >
+              <option value="all">All Severities</option>
+              <option value="MINOR">Minor</option>
+              <option value="MODERATE">Moderate</option>
+              <option value="SERIOUS">Serious</option>
+              <option value="CRITICAL">Critical</option>
+            </select>
+
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="form-input w-40"
+            >
+              <option value="all">All Statuses</option>
+              <option value="REPORTED">Reported</option>
+              <option value="INVESTIGATING">Investigating</option>
+              <option value="RESOLVED">Resolved</option>
+              <option value="CLOSED">Closed</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label className="form-label">Status</label>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="form-input w-48"
-          >
-            <option value="all">All Statuses</option>
-            <option value="OPEN">Open</option>
-            <option value="UNDER_INVESTIGATION">Under Investigation</option>
-            <option value="RESOLVED">Resolved</option>
-            <option value="CLOSED">Closed</option>
-          </select>
+
+        <div className="mt-3 text-sm text-gray-500">
+          Showing {filteredIncidents.length} of {incidents.length} incidents
         </div>
-      </div>
+      </Card>
 
       {/* Incidents List */}
-      <div className="space-y-4">
-        {filteredIncidents.map((incident) => (
-          <Card key={incident.id} className="hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4">
-                <div className={`p-3 rounded-lg ${severityColors[incident.severityLevel]}`}>
-                  <ExclamationTriangleIcon className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-semibold text-rink-900">{incident.incidentType}</h3>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${severityColors[incident.severityLevel]}`}>
-                      {incident.severityLevel}
-                    </span>
-                    {incident.ambulanceCalled && (
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 flex items-center gap-1">
-                        <PhoneIcon className="w-3 h-3" />
-                        EMS Called
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ice-600"></div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredIncidents.map((incident) => (
+            <Card
+              key={incident.id}
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() =>
+                (window.location.href = `/dashboard/incidents/${incident.id}`)
+              }
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div
+                    className={clsx(
+                      'p-3 rounded-lg',
+                      severityColors[incident.severity]
+                    )}
+                  >
+                    <ExclamationTriangleIcon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h3 className="font-semibold text-gray-900">
+                        {incident.incidentType}
+                      </h3>
+                      <span
+                        className={clsx(
+                          'px-2 py-1 text-xs font-medium rounded-full',
+                          severityColors[incident.severity]
+                        )}
+                      >
+                        {incident.severity}
                       </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-rink-500 mt-1">{incident.location}</p>
-                  <p className="text-sm text-rink-600 mt-2 line-clamp-2">{incident.description}</p>
-
-                  <div className="flex items-center gap-4 mt-3 text-xs text-rink-500">
-                    <div className="flex items-center gap-1">
-                      <ClockIcon className="w-4 h-4" />
-                      {format(new Date(incident.incidentTime), 'MMM d, yyyy h:mm a')}
+                      {(incident.injuryDetails as Record<string, unknown>)
+                        ?.ambulanceCalled && (
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 flex items-center gap-1">
+                          <PhoneIcon className="w-3 h-3" />
+                          EMS Called
+                        </span>
+                      )}
                     </div>
-                    {incident.injuredName && (
+                    <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
+                      <MapPinIcon className="w-4 h-4" />
+                      {incident.location || 'Location not specified'}
+                    </p>
+                    <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                      {incident.description}
+                    </p>
+
+                    <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
                       <div className="flex items-center gap-1">
-                        <UserIcon className="w-4 h-4" />
-                        {incident.injuredName}
+                        <ClockIcon className="w-4 h-4" />
+                        {format(
+                          new Date(incident.occurredAt || incident.reportedAt),
+                          'MMM d, yyyy h:mm a'
+                        )}
                       </div>
-                    )}
-                    <div>Reported by: {incident.reportedBy}</div>
+                      {(incident.injuryDetails as Record<string, unknown>)
+                        ?.personName && (
+                        <div className="flex items-center gap-1">
+                          <UserIcon className="w-4 h-4" />
+                          {
+                            (incident.injuryDetails as Record<string, unknown>)
+                              .personName as string
+                          }
+                        </div>
+                      )}
+                      {incident.reportedBy && (
+                        <div>Reported by: {incident.reportedBy.name}</div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-3">
-                <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusColors[incident.status]}`}>
-                  {incident.status.replace('_', ' ')}
-                </span>
-                <Link href={`/dashboard/incidents/${incident.id}`}>
-                  <Button variant="ghost" size="sm">
+                <div className="flex items-center gap-3">
+                  <span
+                    className={clsx(
+                      'px-3 py-1 text-xs font-medium rounded-full',
+                      statusColors[incident.status]
+                    )}
+                  >
+                    {statusLabels[incident.status] ||
+                      incident.status?.replace('_', ' ')}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.href = `/dashboard/incidents/${incident.id}`;
+                    }}
+                  >
                     <EyeIcon className="w-4 h-4" />
                   </Button>
-                </Link>
+                </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          ))}
 
-        {filteredIncidents.length === 0 && (
-          <Card className="text-center py-12">
-            <ExclamationTriangleIcon className="w-12 h-12 mx-auto text-rink-300 mb-4" />
-            <h3 className="text-lg font-medium text-rink-700">No incidents found</h3>
-            <p className="text-rink-500 mt-1">No incidents match your filter criteria</p>
-          </Card>
-        )}
-      </div>
+          {filteredIncidents.length === 0 && !isLoading && (
+            <Card className="text-center py-12">
+              <ExclamationTriangleIcon className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-700">
+                No incidents found
+              </h3>
+              <p className="text-gray-500 mt-1">
+                {searchQuery || filterSeverity !== 'all' || filterStatus !== 'all'
+                  ? 'No incidents match your filter criteria'
+                  : 'No incidents have been reported yet'}
+              </p>
+              <Link href="/dashboard/incidents/new" className="inline-block mt-4">
+                <Button>
+                  <PlusIcon className="w-4 h-4 mr-2" />
+                  Report First Incident
+                </Button>
+              </Link>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }
