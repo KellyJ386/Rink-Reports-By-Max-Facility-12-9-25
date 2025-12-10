@@ -5,7 +5,6 @@ import { Menu, Transition } from '@headlessui/react';
 import { signOut, useSession } from 'next-auth/react';
 import {
   BellIcon,
-  MagnifyingGlassIcon,
   ChevronDownIcon,
   UserCircleIcon,
   CogIcon,
@@ -14,6 +13,8 @@ import {
 import clsx from 'clsx';
 import { MobileMenuButton } from './Sidebar';
 import { RoleBadge } from '@/components/ui/Badge';
+import { GlobalSearch } from './GlobalSearch';
+import { ThemeToggle } from '@/components/providers/ThemeProvider';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -23,36 +24,26 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { data: session } = useSession();
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rink-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rink-200 dark:border-rink-700 bg-white dark:bg-rink-900 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
       <MobileMenuButton onClick={onMenuClick} />
 
       {/* Separator */}
       <div className="h-6 w-px bg-rink-200 lg:hidden" aria-hidden="true" />
 
       <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-        {/* Search */}
-        <form className="relative flex flex-1" action="#" method="GET">
-          <label htmlFor="search-field" className="sr-only">
-            Search
-          </label>
-          <MagnifyingGlassIcon
-            className="pointer-events-none absolute inset-y-0 left-0 h-full w-5 text-rink-400"
-            aria-hidden="true"
-          />
-          <input
-            id="search-field"
-            className="block h-full w-full border-0 py-0 pl-8 pr-0 text-rink-900 placeholder:text-rink-400 focus:ring-0 sm:text-sm bg-transparent"
-            placeholder="Search forms, incidents, reports..."
-            type="search"
-            name="search"
-          />
-        </form>
+        {/* Global Search */}
+        <div className="flex flex-1 items-center">
+          <GlobalSearch />
+        </div>
 
         <div className="flex items-center gap-x-4 lg:gap-x-6">
+          {/* Theme Toggle */}
+          <ThemeToggle />
+
           {/* Notifications */}
           <button
             type="button"
-            className="-m-2.5 p-2.5 text-rink-400 hover:text-rink-500 relative"
+            className="-m-2.5 p-2.5 text-rink-400 hover:text-rink-500 dark:hover:text-rink-300 relative"
           >
             <span className="sr-only">View notifications</span>
             <BellIcon className="h-6 w-6" aria-hidden="true" />
@@ -61,7 +52,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           </button>
 
           {/* Separator */}
-          <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-rink-200" aria-hidden="true" />
+          <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-rink-200 dark:bg-rink-700" aria-hidden="true" />
 
           {/* Profile dropdown */}
           <Menu as="div" className="relative">
@@ -82,7 +73,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               )}
               <span className="hidden lg:flex lg:items-center">
                 <span
-                  className="ml-4 text-sm font-semibold leading-6 text-rink-900"
+                  className="ml-4 text-sm font-semibold leading-6 text-rink-900 dark:text-rink-100"
                   aria-hidden="true"
                 >
                   {session?.user?.name || 'User'}
@@ -99,12 +90,12 @@ export function Header({ onMenuClick }: HeaderProps) {
               leaveFrom="transform opacity-100 scale-100"
               leaveTo="transform opacity-0 scale-95"
             >
-              <Menu.Items className="absolute right-0 z-10 mt-2.5 w-56 origin-top-right rounded-xl bg-white py-2 shadow-lg ring-1 ring-rink-900/5 focus:outline-none">
-                <div className="px-4 py-3 border-b border-rink-100">
-                  <p className="text-sm font-medium text-rink-900">
+              <Menu.Items className="absolute right-0 z-10 mt-2.5 w-56 origin-top-right rounded-xl bg-white dark:bg-rink-800 py-2 shadow-lg ring-1 ring-rink-900/5 dark:ring-rink-700 focus:outline-none">
+                <div className="px-4 py-3 border-b border-rink-100 dark:border-rink-700">
+                  <p className="text-sm font-medium text-rink-900 dark:text-rink-100">
                     {session?.user?.name || 'User'}
                   </p>
-                  <p className="text-xs text-rink-500 truncate">{session?.user?.email}</p>
+                  <p className="text-xs text-rink-500 dark:text-rink-400 truncate">{session?.user?.email}</p>
                   <div className="mt-2">
                     {session?.user?.role && <RoleBadge role={session.user.role} />}
                   </div>
@@ -112,10 +103,10 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <Menu.Item>
                   {({ active }) => (
                     <a
-                      href="/profile"
+                      href="/dashboard/settings"
                       className={clsx(
-                        active ? 'bg-rink-50' : '',
-                        'flex items-center gap-3 px-4 py-2 text-sm text-rink-700'
+                        active ? 'bg-rink-50 dark:bg-rink-700' : '',
+                        'flex items-center gap-3 px-4 py-2 text-sm text-rink-700 dark:text-rink-300'
                       )}
                     >
                       <UserCircleIcon className="w-5 h-5 text-rink-400" />
@@ -126,10 +117,10 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <Menu.Item>
                   {({ active }) => (
                     <a
-                      href="/settings"
+                      href="/dashboard/settings"
                       className={clsx(
-                        active ? 'bg-rink-50' : '',
-                        'flex items-center gap-3 px-4 py-2 text-sm text-rink-700'
+                        active ? 'bg-rink-50 dark:bg-rink-700' : '',
+                        'flex items-center gap-3 px-4 py-2 text-sm text-rink-700 dark:text-rink-300'
                       )}
                     >
                       <CogIcon className="w-5 h-5 text-rink-400" />
@@ -137,14 +128,14 @@ export function Header({ onMenuClick }: HeaderProps) {
                     </a>
                   )}
                 </Menu.Item>
-                <div className="border-t border-rink-100 mt-2 pt-2">
+                <div className="border-t border-rink-100 dark:border-rink-700 mt-2 pt-2">
                   <Menu.Item>
                     {({ active }) => (
                       <button
                         onClick={() => signOut({ callbackUrl: '/' })}
                         className={clsx(
-                          active ? 'bg-rink-50' : '',
-                          'flex items-center gap-3 px-4 py-2 text-sm text-red-600 w-full text-left'
+                          active ? 'bg-rink-50 dark:bg-rink-700' : '',
+                          'flex items-center gap-3 px-4 py-2 text-sm text-red-600 dark:text-red-400 w-full text-left'
                         )}
                       >
                         <ArrowRightOnRectangleIcon className="w-5 h-5" />

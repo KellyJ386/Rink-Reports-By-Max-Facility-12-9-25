@@ -77,3 +77,12 @@ export type {
   DashboardStats,
   ModuleSummary,
 } from './useDashboard';
+
+// Keyboard shortcuts hooks
+export {
+  useKeyboardShortcuts,
+  useNavigationShortcuts,
+  KeyboardShortcutsHelp,
+  formatShortcut,
+} from './useKeyboardShortcuts';
+export type { Shortcut } from './useKeyboardShortcuts';

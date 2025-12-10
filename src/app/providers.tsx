@@ -3,6 +3,8 @@
 import { SessionProvider } from 'next-auth/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { HelpProvider } from '@/components/ui/HelpSystem';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -25,7 +27,11 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
-        {children}
+        <ThemeProvider defaultTheme="system" storageKey="mfo-theme">
+          <HelpProvider>
+            {children}
+          </HelpProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </SessionProvider>
   );
