@@ -2,16 +2,18 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Card } from '@/components/ui/Card';
+import { Card, CardHeader, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { RefrigerationTrendChart } from '@/components/refrigeration/RefrigerationTrendChart';
 import {
   BeakerIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   PlusIcon,
   ClockIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 
@@ -30,36 +32,29 @@ interface RefrigerationReading {
   notes?: string;
 }
 
-// Mock data
-const mockReadings: RefrigerationReading[] = [
-  {
-    id: '1',
-    recordedAt: new Date().toISOString(),
-    compressor1Suction: 28,
-    compressor1Discharge: 180,
-    compressor2Suction: 27,
-    compressor2Discharge: 175,
-    brineSupply: 18,
-    brineReturn: 22,
-    oilLevel: 'OK',
-    refrigerantLevel: 'OK',
-    alarmsPresent: false,
-  },
-  {
-    id: '2',
-    recordedAt: new Date(Date.now() - 86400000).toISOString(),
-    compressor1Suction: 30,
-    compressor1Discharge: 185,
-    compressor2Suction: 29,
-    compressor2Discharge: 178,
-    brineSupply: 19,
-    brineReturn: 23,
-    oilLevel: 'LOW',
-    refrigerantLevel: 'OK',
-    alarmsPresent: false,
-    notes: 'Oil level slightly low, scheduled for top-up',
-  },
-];
+// Generate mock data for the past 7 days
+const generateMockReadings = (): RefrigerationReading[] => {
+  const readings: RefrigerationReading[] = [];
+  for (let i = 0; i < 14; i++) {
+    readings.push({
+      id: `reading-${i}`,
+      recordedAt: new Date(Date.now() - i * 43200000).toISOString(), // Every 12 hours
+      compressor1Suction: 25 + Math.random() * 10,
+      compressor1Discharge: 170 + Math.random() * 20,
+      compressor2Suction: 24 + Math.random() * 10,
+      compressor2Discharge: 168 + Math.random() * 20,
+      brineSupply: 16 + Math.random() * 6,
+      brineReturn: 20 + Math.random() * 6,
+      oilLevel: i === 3 ? 'LOW' : 'OK',
+      refrigerantLevel: 'OK',
+      alarmsPresent: i === 5,
+      notes: i === 3 ? 'Oil level slightly low, scheduled for top-up' : undefined,
+    });
+  }
+  return readings;
+};
+
+const mockReadings: RefrigerationReading[] = generateMockReadings();
 
 const statusColors = {
   OK: 'bg-green-100 text-green-800',
@@ -71,6 +66,8 @@ const statusColors = {
 export default function RefrigerationPage() {
   const [readings, setReadings] = useState<RefrigerationReading[]>(mockReadings);
   const [showForm, setShowForm] = useState(false);
+  const [showChart, setShowChart] = useState(true);
+  const [chartMetric, setChartMetric] = useState<'compressor' | 'brine' | 'all'>('compressor');
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
   const onSubmit = (data: unknown) => {
@@ -164,6 +161,46 @@ export default function RefrigerationPage() {
           </div>
         </Card>
       </div>
+
+      {/* Trend Charts */}
+      <Card padding="none">
+        <CardHeader
+          title={
+            <div className="flex items-center gap-2">
+              <ChartBarIcon className="w-5 h-5 text-ice-600" />
+              <span>Trend Analysis</span>
+            </div>
+          }
+          action={
+            <div className="flex items-center gap-2">
+              <select
+                value={chartMetric}
+                onChange={(e) => setChartMetric(e.target.value as 'compressor' | 'brine' | 'all')}
+                className="form-input text-sm py-1"
+              >
+                <option value="compressor">Compressor Pressures</option>
+                <option value="brine">Brine Temperatures</option>
+                <option value="all">All Metrics</option>
+              </select>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowChart(!showChart)}
+              >
+                {showChart ? 'Hide' : 'Show'}
+              </Button>
+            </div>
+          }
+        />
+        {showChart && (
+          <CardContent>
+            <RefrigerationTrendChart
+              data={[...readings].reverse()}
+              metric={chartMetric}
+            />
+          </CardContent>
+        )}
+      </Card>
 
       {/* New Reading Form */}
       {showForm && (

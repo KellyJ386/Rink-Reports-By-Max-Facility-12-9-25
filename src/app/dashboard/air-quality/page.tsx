@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Card } from '@/components/ui/Card';
+import { Card, CardHeader, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { AirQualityChart } from '@/components/air-quality/AirQualityChart';
 import {
   CloudIcon,
   ExclamationTriangleIcon,
@@ -13,6 +14,7 @@ import {
   PlusIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 
@@ -35,39 +37,29 @@ const THRESHOLDS = {
   CO_DANGER: 35,
 };
 
-// Mock data
-const mockReadings: AirQualityReading[] = [
-  {
-    id: '1',
-    recordedAt: new Date().toISOString(),
-    location: 'Rink A - Main Area',
-    co2Level: 650,
-    temperature: 62,
-    humidity: 45,
-    coLevel: 0,
-    thresholdExceeded: false,
-  },
-  {
-    id: '2',
-    recordedAt: new Date(Date.now() - 3600000).toISOString(),
-    location: 'Rink B - Spectator Area',
-    co2Level: 890,
-    temperature: 68,
-    humidity: 52,
-    coLevel: 2,
-    thresholdExceeded: true,
-  },
-  {
-    id: '3',
-    recordedAt: new Date(Date.now() - 7200000).toISOString(),
-    location: 'Lobby',
-    co2Level: 520,
-    temperature: 70,
-    humidity: 40,
-    coLevel: 0,
-    thresholdExceeded: false,
-  },
-];
+// Generate mock data for the past 7 days
+const generateMockReadings = (): AirQualityReading[] => {
+  const readings: AirQualityReading[] = [];
+  const locations = ['Rink A - Main Area', 'Rink B - Spectator Area', 'Lobby'];
+
+  for (let i = 0; i < 21; i++) {
+    const co2Level = 500 + Math.random() * 600; // 500-1100 ppm range
+    const coLevel = Math.random() * 15; // 0-15 ppm
+    readings.push({
+      id: `reading-${i}`,
+      recordedAt: new Date(Date.now() - i * 21600000).toISOString(), // Every 6 hours
+      location: locations[i % locations.length],
+      co2Level: Math.round(co2Level),
+      temperature: Math.round(60 + Math.random() * 15),
+      humidity: Math.round(35 + Math.random() * 25),
+      coLevel: Math.round(coLevel * 10) / 10,
+      thresholdExceeded: co2Level > THRESHOLDS.CO2_WARNING || coLevel > THRESHOLDS.CO_WARNING,
+    });
+  }
+  return readings;
+};
+
+const mockReadings: AirQualityReading[] = generateMockReadings();
 
 const getCO2Status = (level: number) => {
   if (level >= THRESHOLDS.CO2_DANGER) return { color: 'text-red-600', bg: 'bg-red-100', label: 'Danger' };
@@ -78,6 +70,8 @@ const getCO2Status = (level: number) => {
 export default function AirQualityPage() {
   const [readings, setReadings] = useState<AirQualityReading[]>(mockReadings);
   const [showForm, setShowForm] = useState(false);
+  const [showChart, setShowChart] = useState(true);
+  const [chartMetric, setChartMetric] = useState<'co2' | 'co' | 'all'>('co2');
   const { register, handleSubmit, reset } = useForm();
 
   const onSubmit = (data: unknown) => {
@@ -214,6 +208,53 @@ export default function AirQualityPage() {
           );
         })}
       </div>
+
+      {/* Trend Chart */}
+      <Card padding="none">
+        <CardHeader
+          title={
+            <div className="flex items-center gap-2">
+              <ChartBarIcon className="w-5 h-5 text-ice-600" />
+              <span>Air Quality Trends</span>
+            </div>
+          }
+          action={
+            <div className="flex items-center gap-2">
+              <select
+                value={chartMetric}
+                onChange={(e) => setChartMetric(e.target.value as 'co2' | 'co' | 'all')}
+                className="form-input text-sm py-1"
+              >
+                <option value="co2">CO₂ Levels</option>
+                <option value="co">CO Levels</option>
+                <option value="all">All Metrics</option>
+              </select>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowChart(!showChart)}
+              >
+                {showChart ? 'Hide' : 'Show'}
+              </Button>
+            </div>
+          }
+        />
+        {showChart && (
+          <CardContent>
+            <AirQualityChart
+              data={[...readings].reverse().map(r => ({
+                recordedAt: r.recordedAt,
+                co2Level: r.co2Level,
+                coLevel: r.coLevel ?? null,
+                temperature: r.temperature,
+                humidity: r.humidity,
+                location: r.location,
+              }))}
+              metric={chartMetric}
+            />
+          </CardContent>
+        )}
+      </Card>
 
       {/* New Reading Form */}
       {showForm && (

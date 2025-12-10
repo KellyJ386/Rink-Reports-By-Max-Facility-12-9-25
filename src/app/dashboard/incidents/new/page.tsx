@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { BodyDiagram } from '@/components/incidents/BodyDiagram';
+import { useCreateIncident } from '@/hooks';
 import { BodyInjury } from '@/types';
 import {
   ArrowLeftIcon,
@@ -14,8 +15,33 @@ import {
   PhoneIcon,
   PlusIcon,
   TrashIcon,
+  UserIcon,
 } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
+
+const injuryTypes = [
+  'Laceration/Cut',
+  'Bruise/Contusion',
+  'Sprain/Strain',
+  'Fracture',
+  'Concussion',
+  'Abrasion/Scrape',
+  'Dislocation',
+  'Burn',
+  'Frostbite',
+  'Other',
+];
+
+const personTypes = [
+  'Player',
+  'Spectator',
+  'Staff',
+  'Coach',
+  'Referee',
+  'Visitor',
+  'Contractor',
+  'Other',
+];
 
 interface Witness {
   id: string;
@@ -25,11 +51,12 @@ interface Witness {
 
 export default function NewIncidentPage() {
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const createIncident = useCreateIncident();
   const [injuries, setInjuries] = useState<BodyInjury[]>([]);
   const [witnesses, setWitnesses] = useState<Witness[]>([]);
   const [showWitnessForm, setShowWitnessForm] = useState(false);
   const [newWitness, setNewWitness] = useState({ name: '', contact: '' });
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -47,11 +74,17 @@ export default function NewIncidentPage() {
       injuredName: '',
       injuredContact: '',
       injuredAge: '',
+      injuredPersonType: '',
+      injuryType: '',
+      treatmentProvided: '',
+      medicalAttention: false,
+      immediateActions: '',
     },
   });
 
   const severityLevel = watch('severityLevel');
   const ambulanceCalled = watch('ambulanceCalled');
+  const injuredName = watch('injuredName');
 
   const handleAddInjury = (injury: BodyInjury) => {
     setInjuries([...injuries, injury]);
@@ -77,31 +110,40 @@ export default function NewIncidentPage() {
   };
 
   const onSubmit = async (data: Record<string, unknown>) => {
-    setIsSubmitting(true);
+    setSubmitError(null);
     try {
-      // In production, this would call the API
-      const incidentData = {
-        ...data,
-        facilityId: 'facility-1', // Would come from session
-        bodyDiagramData: { injuries },
-        witnesses: witnesses.map(({ name, contact }) => ({ name, contact })),
-      };
+      // Build injury details from form and body diagram
+      const injuryDetails = injuredName ? {
+        personName: data.injuredName as string,
+        personType: data.injuredPersonType as string || 'Other',
+        injuryType: data.injuryType as string || 'Other',
+        bodyParts: injuries.map(i => i.bodyPart),
+        treatmentProvided: data.treatmentProvided as string,
+        medicalAttention: Boolean(data.medicalAttention),
+        ambulanceCalled: Boolean(data.ambulanceCalled),
+      } : undefined;
 
-      console.log('Submitting incident:', incidentData);
+      await createIncident.mutateAsync({
+        facilityId: 'facility-1', // Would come from session/context
+        incidentType: data.incidentType as string,
+        severity: data.severityLevel as string,
+        occurredAt: new Date(data.incidentTime as string).toISOString(),
+        location: data.location as string,
+        description: data.description as string,
+        injuryDetails,
+        witnesses: witnesses.map(({ name, contact }) => `${name}${contact ? ` (${contact})` : ''}`),
+        immediateActions: data.immediateActions as string,
+      });
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Show success message if ambulance was called
-      if (data.ambulanceCalled) {
-        alert('GM has been notified via SMS about this serious incident.');
+      // Show notification for serious incidents
+      if (ambulanceCalled || ['SERIOUS', 'CRITICAL'].includes(severityLevel)) {
+        alert('Incident reported. GM has been notified.');
       }
 
       router.push('/dashboard/incidents');
     } catch (error) {
       console.error('Error submitting incident:', error);
-    } finally {
-      setIsSubmitting(false);
+      setSubmitError(error instanceof Error ? error.message : 'Failed to submit incident');
     }
   };
 
@@ -240,29 +282,83 @@ export default function NewIncidentPage() {
                     </p>
                   </div>
                 </div>
+
+                <div>
+                  <label className="form-label">Immediate Actions Taken</label>
+                  <textarea
+                    {...register('immediateActions')}
+                    className="form-input h-24"
+                    placeholder="Describe what actions were taken immediately after the incident (e.g., first aid provided, area secured, equipment shut down)..."
+                  />
+                </div>
               </div>
             </Card>
 
             {/* Injured Party */}
             <Card>
-              <h3 className="text-lg font-semibold text-rink-900 mb-4">Injured Party Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  {...register('injuredName')}
-                  label="Name"
-                  placeholder="Full name"
-                />
-                <Input
-                  {...register('injuredContact')}
-                  label="Contact Number"
-                  placeholder="Phone number"
-                />
-                <Input
-                  {...register('injuredAge')}
-                  type="number"
-                  label="Age"
-                  placeholder="Age"
-                />
+              <h3 className="text-lg font-semibold text-rink-900 mb-4 flex items-center gap-2">
+                <UserIcon className="w-5 h-5" />
+                Injured Party Details
+              </h3>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Input
+                    {...register('injuredName')}
+                    label="Name"
+                    placeholder="Full name"
+                  />
+                  <Input
+                    {...register('injuredContact')}
+                    label="Contact Number"
+                    placeholder="Phone number"
+                  />
+                  <Input
+                    {...register('injuredAge')}
+                    type="number"
+                    label="Age"
+                    placeholder="Age"
+                  />
+                  <div>
+                    <label className="form-label">Person Type</label>
+                    <select {...register('injuredPersonType')} className="form-input">
+                      <option value="">Select type...</option>
+                      {personTypes.map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {injuredName && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-rink-50 rounded-lg">
+                    <div>
+                      <label className="form-label">Injury Type</label>
+                      <select {...register('injuryType')} className="form-input">
+                        <option value="">Select injury type...</option>
+                        {injuryTypes.map((type) => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Treatment Provided</label>
+                      <Input
+                        {...register('treatmentProvided')}
+                        placeholder="e.g., Ice pack applied, wound cleaned..."
+                      />
+                    </div>
+                    <div className="md:col-span-2 flex items-center gap-3">
+                      <input
+                        {...register('medicalAttention')}
+                        type="checkbox"
+                        className="w-4 h-4 text-ice-600 rounded border-rink-300 focus:ring-ice-500"
+                      />
+                      <label className="text-sm text-rink-700">
+                        Professional medical attention was sought or recommended
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
 
@@ -376,10 +472,16 @@ export default function NewIncidentPage() {
                   </p>
                 </div>
 
+                {submitError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    {submitError}
+                  </div>
+                )}
+
                 <Button
                   type="submit"
                   className="w-full"
-                  isLoading={isSubmitting}
+                  isLoading={createIncident.isPending}
                 >
                   Submit Incident Report
                 </Button>
