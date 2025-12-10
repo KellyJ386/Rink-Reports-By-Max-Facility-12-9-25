@@ -87,6 +87,7 @@ model User {
   notifications Notification[]
   auditLogs     AuditLog[]
   createdForms  FormTemplate[] @relation("FormCreator")
+  notificationsSent NotificationLog[] @relation("NotificationSender")
 
   @@index([email])
   @@index([role])
@@ -151,6 +152,7 @@ model Facility {
   equipmentItems  Equipment[]
   alerts          Alert[]
   weatherCache    WeatherCache?
+  notificationLogs NotificationLog[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -982,6 +984,31 @@ model Alert {
 
   @@index([facilityId])
   @@index([isAcknowledged])
+  @@index([createdAt])
+}
+
+// Log of sent notifications (email/SMS)
+model NotificationLog {
+  id              String   @id @default(cuid())
+  facilityId      String
+  sentBy          String?
+
+  type            String   // INCIDENT, ICE_THIN, REFRIGERATION, AIR_QUALITY, CUSTOM
+  severity        String   // INFO, WARNING, SERIOUS, CRITICAL
+  message         String
+  recipientCount  Int      @default(0)
+
+  success         Boolean  @default(true)
+  error           String?
+  messageId       String?  // From email provider
+
+  createdAt       DateTime @default(now())
+
+  facility        Facility @relation(fields: [facilityId], references: [id])
+  sentByUser      User?    @relation("NotificationSender", fields: [sentBy], references: [id])
+
+  @@index([facilityId])
+  @@index([type])
   @@index([createdAt])
 }
 
