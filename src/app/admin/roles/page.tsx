@@ -5,10 +5,17 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import {
+  useRoleStatsLive,
+  ROLE_LABELS,
+  ROLE_DESCRIPTIONS,
+  type UserRole,
+} from '@/hooks';
+import {
   ShieldCheckIcon,
-  PencilIcon,
   UsersIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
+import { formatDistanceToNow } from 'date-fns';
 
 interface Permission {
   id: string;
@@ -17,15 +24,7 @@ interface Permission {
   category: string;
 }
 
-interface Role {
-  id: string;
-  name: string;
-  description: string;
-  usersCount: number;
-  permissions: string[];
-  isSystem: boolean;
-}
-
+// Permission definitions - these are application-level constants
 const allPermissions: Permission[] = [
   // Dashboard
   { id: 'dashboard.view', name: 'View Dashboard', description: 'Access the main dashboard', category: 'Dashboard' },
@@ -43,6 +42,14 @@ const allPermissions: Permission[] = [
   { id: 'ice.create', name: 'Create Ice Readings', description: 'Record new ice depth readings', category: 'Ice Depth' },
   { id: 'ice.analyze', name: 'Run Analysis', description: 'Run AI analysis on readings', category: 'Ice Depth' },
 
+  // Air Quality
+  { id: 'airquality.view', name: 'View Air Quality', description: 'View air quality readings', category: 'Air Quality' },
+  { id: 'airquality.create', name: 'Create Readings', description: 'Record air quality readings', category: 'Air Quality' },
+
+  // Refrigeration
+  { id: 'refrigeration.view', name: 'View Refrigeration', description: 'View refrigeration status', category: 'Refrigeration' },
+  { id: 'refrigeration.create', name: 'Create Readings', description: 'Record refrigeration readings', category: 'Refrigeration' },
+
   // Schedule
   { id: 'schedule.view', name: 'View Schedule', description: 'View staff schedules', category: 'Schedule' },
   { id: 'schedule.edit', name: 'Edit Schedule', description: 'Modify staff schedules', category: 'Schedule' },
@@ -52,6 +59,11 @@ const allPermissions: Permission[] = [
   { id: 'forms.view', name: 'View Forms', description: 'View form submissions', category: 'Forms' },
   { id: 'forms.submit', name: 'Submit Forms', description: 'Submit operational forms', category: 'Forms' },
   { id: 'forms.manage', name: 'Manage Forms', description: 'Create and edit form templates', category: 'Forms' },
+
+  // Reports
+  { id: 'reports.view', name: 'View Reports', description: 'View generated reports', category: 'Reports' },
+  { id: 'reports.generate', name: 'Generate Reports', description: 'Create new reports', category: 'Reports' },
+  { id: 'reports.schedule', name: 'Schedule Reports', description: 'Schedule automated reports', category: 'Reports' },
 
   // Users
   { id: 'users.view', name: 'View Users', description: 'View user list', category: 'Users' },
@@ -66,53 +78,65 @@ const allPermissions: Permission[] = [
   { id: 'admin.billing', name: 'Manage Billing', description: 'Access billing settings', category: 'Admin' },
 ];
 
-const mockRoles: Role[] = [
-  {
-    id: 'super_admin',
-    name: 'Super Admin',
-    description: 'Full system access with all permissions',
-    usersCount: 2,
-    permissions: allPermissions.map(p => p.id),
-    isSystem: true,
-  },
-  {
-    id: 'facility_admin',
-    name: 'Facility Admin',
-    description: 'Full access to facility operations',
-    usersCount: 5,
-    permissions: allPermissions.filter(p => p.category !== 'Admin' || p.id === 'admin.access').map(p => p.id),
-    isSystem: true,
-  },
-  {
-    id: 'manager',
-    name: 'Manager',
-    description: 'Manage daily operations and staff',
-    usersCount: 12,
-    permissions: ['dashboard.view', 'dashboard.analytics', 'incidents.view', 'incidents.create', 'incidents.edit', 'incidents.resolve', 'ice.view', 'ice.create', 'schedule.view', 'schedule.edit', 'schedule.approve', 'forms.view', 'forms.submit', 'users.view'],
-    isSystem: true,
-  },
-  {
-    id: 'ice_tech',
-    name: 'Ice Technician',
-    description: 'Ice maintenance and monitoring',
-    usersCount: 18,
-    permissions: ['dashboard.view', 'incidents.view', 'incidents.create', 'ice.view', 'ice.create', 'ice.analyze', 'forms.view', 'forms.submit'],
-    isSystem: false,
-  },
-  {
-    id: 'staff',
-    name: 'Staff',
-    description: 'Basic operational access',
-    usersCount: 45,
-    permissions: ['dashboard.view', 'incidents.view', 'incidents.create', 'ice.view', 'schedule.view', 'forms.view', 'forms.submit'],
-    isSystem: false,
-  },
+// Role permission mappings
+const rolePermissions: Record<UserRole, string[]> = {
+  SUPER_ADMIN: allPermissions.map(p => p.id),
+  FACILITY_ADMIN: allPermissions.filter(p => p.category !== 'Admin' || p.id === 'admin.access').map(p => p.id),
+  MANAGER: [
+    'dashboard.view', 'dashboard.analytics',
+    'incidents.view', 'incidents.create', 'incidents.edit', 'incidents.resolve',
+    'ice.view', 'ice.create',
+    'airquality.view', 'airquality.create',
+    'refrigeration.view', 'refrigeration.create',
+    'schedule.view', 'schedule.edit', 'schedule.approve',
+    'forms.view', 'forms.submit',
+    'reports.view', 'reports.generate',
+    'users.view',
+  ],
+  SUPERVISOR: [
+    'dashboard.view',
+    'incidents.view', 'incidents.create', 'incidents.edit',
+    'ice.view', 'ice.create',
+    'airquality.view',
+    'refrigeration.view',
+    'schedule.view', 'schedule.edit',
+    'forms.view', 'forms.submit',
+    'reports.view',
+  ],
+  ICE_TECHNICIAN: [
+    'dashboard.view',
+    'incidents.view', 'incidents.create',
+    'ice.view', 'ice.create', 'ice.analyze',
+    'airquality.view', 'airquality.create',
+    'refrigeration.view', 'refrigeration.create',
+    'forms.view', 'forms.submit',
+  ],
+  STAFF: [
+    'dashboard.view',
+    'incidents.view', 'incidents.create',
+    'ice.view',
+    'airquality.view',
+    'schedule.view',
+    'forms.view', 'forms.submit',
+  ],
+};
+
+const REFRESH_OPTIONS = [
+  { label: 'Off', value: 0 },
+  { label: '30s', value: 30000 },
+  { label: '1m', value: 60000 },
+  { label: '5m', value: 300000 },
 ];
 
 export default function RolesPage() {
-  const [roles] = useState<Role[]>(mockRoles);
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [refreshInterval, setRefreshInterval] = useState(60000);
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [showModal, setShowModal] = useState(false);
+
+  const { data, isLoading, error, refetch, dataUpdatedAt } = useRoleStatsLive({
+    refreshInterval,
+    enabled: true,
+  });
 
   const permissionsByCategory = allPermissions.reduce((acc, perm) => {
     if (!acc[perm.category]) acc[perm.category] = [];
@@ -120,75 +144,138 @@ export default function RolesPage() {
     return acc;
   }, {} as Record<string, Permission[]>);
 
+  const formatLastUpdated = () => {
+    if (!dataUpdatedAt) return 'Never';
+    return formatDistanceToNow(dataUpdatedAt, { addSuffix: true });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+          <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="p-6 animate-pulse">
+              <div className="h-12 w-12 bg-gray-200 dark:bg-gray-700 rounded-lg mb-4" />
+              <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+              <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded" />
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 p-4 rounded-lg">
+        <p className="font-medium">Failed to load role statistics</p>
+        <p className="text-sm mt-1">{error.message}</p>
+        <button
+          onClick={() => refetch()}
+          className="mt-2 text-sm underline hover:no-underline"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  const roles = data?.roles || [];
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Roles & Permissions</h1>
           <p className="text-gray-600 dark:text-gray-400">Manage user roles and access permissions</p>
         </div>
-        <Button onClick={() => { setSelectedRole(null); setShowModal(true); }}>
-          <ShieldCheckIcon className="w-4 h-4 mr-2" />
-          Create Role
-        </Button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-500">
+            Updated {formatLastUpdated()}
+          </span>
+          <select
+            value={refreshInterval}
+            onChange={(e) => setRefreshInterval(Number(e.target.value))}
+            className="text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+          >
+            {REFRESH_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => refetch()}
+            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            title="Refresh now"
+          >
+            <ArrowPathIcon className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Roles Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {roles.map((role) => (
-          <Card key={role.id} className="p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/20 rounded-lg flex items-center justify-center">
-                  <ShieldCheckIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">{role.name}</h3>
-                    {role.isSystem && (
-                      <Badge variant="info">System</Badge>
-                    )}
+        {roles.map((role) => {
+          const permissions = rolePermissions[role.id];
+          return (
+            <Card key={role.id} className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/20 rounded-lg flex items-center justify-center">
+                    <ShieldCheckIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
                   </div>
-                  <p className="text-sm text-gray-500">{role.description}</p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{role.name}</h3>
+                      {role.isSystem && (
+                        <Badge variant="info">System</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500">{role.description}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setSelectedRole(role.id); setShowModal(true); }}
+                >
+                  View
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <UsersIcon className="w-4 h-4" />
+                  {role.usersCount} users
+                </div>
+                <div className="text-sm text-gray-500">
+                  {permissions.length} permissions
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setSelectedRole(role); setShowModal(true); }}
-                disabled={role.isSystem}
-              >
-                <PencilIcon className="w-4 h-4" />
-              </Button>
-            </div>
 
-            <div className="flex items-center gap-4 mb-4">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <UsersIcon className="w-4 h-4" />
-                {role.usersCount} users
+              <div className="flex flex-wrap gap-1">
+                {Object.keys(permissionsByCategory).map((category) => {
+                  const categoryPerms = permissionsByCategory[category];
+                  const enabledCount = categoryPerms.filter(p => permissions.includes(p.id)).length;
+                  if (enabledCount === 0) return null;
+                  return (
+                    <span
+                      key={category}
+                      className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded"
+                    >
+                      {category}: {enabledCount}/{categoryPerms.length}
+                    </span>
+                  );
+                })}
               </div>
-              <div className="text-sm text-gray-500">
-                {role.permissions.length} permissions
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-1">
-              {Object.keys(permissionsByCategory).map((category) => {
-                const categoryPerms = permissionsByCategory[category];
-                const enabledCount = categoryPerms.filter(p => role.permissions.includes(p.id)).length;
-                if (enabledCount === 0) return null;
-                return (
-                  <span
-                    key={category}
-                    className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded"
-                  >
-                    {category}: {enabledCount}/{categoryPerms.length}
-                  </span>
-                );
-              })}
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
 
       {/* Permissions Reference */}
@@ -214,69 +301,85 @@ export default function RolesPage() {
         </div>
       </Card>
 
-      {/* Edit Role Modal */}
-      {showModal && (
+      {/* View Role Modal */}
+      {showModal && selectedRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-black/50" onClick={() => setShowModal(false)} />
           <Card className="relative z-10 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {selectedRole ? 'Edit Role' : 'Create Role'}
-            </h3>
-            <form className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role Name</label>
-                  <input
-                    type="text"
-                    className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700"
-                    defaultValue={selectedRole?.name}
-                    required
-                  />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/20 rounded-lg flex items-center justify-center">
+                  <ShieldCheckIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-                  <input
-                    type="text"
-                    className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700"
-                    defaultValue={selectedRole?.description}
-                  />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {ROLE_LABELS[selectedRole]}
+                  </h3>
+                  <p className="text-sm text-gray-500">{ROLE_DESCRIPTIONS[selectedRole]}</p>
                 </div>
               </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowModal(false)}>
+                Close
+              </Button>
+            </div>
 
+            <div className="mb-4 flex items-center gap-4 text-sm text-gray-500">
+              <div className="flex items-center gap-2">
+                <UsersIcon className="w-4 h-4" />
+                {roles.find(r => r.id === selectedRole)?.usersCount || 0} users with this role
+              </div>
               <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Permissions</h4>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {Object.entries(permissionsByCategory).map(([category, permissions]) => (
-                    <div key={category} className="border dark:border-gray-700 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h5 className="font-medium text-gray-900 dark:text-white">{category}</h5>
-                        <label className="flex items-center gap-2 text-sm text-gray-500">
-                          <input type="checkbox" className="rounded" />
-                          Select All
-                        </label>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {permissions.map((perm) => (
-                          <label key={perm.id} className="flex items-center gap-2 text-sm">
+                {rolePermissions[selectedRole].length} permissions
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Permissions for this role</h4>
+              {Object.entries(permissionsByCategory).map(([category, permissions]) => {
+                const rolePerms = rolePermissions[selectedRole];
+                const categoryPermissions = permissions.filter(p => rolePerms.includes(p.id));
+                if (categoryPermissions.length === 0) return null;
+
+                return (
+                  <div key={category} className="border dark:border-gray-700 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="font-medium text-gray-900 dark:text-white">{category}</h5>
+                      <span className="text-xs text-gray-500">
+                        {categoryPermissions.length}/{permissions.length} enabled
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {permissions.map((perm) => {
+                        const isEnabled = rolePerms.includes(perm.id);
+                        return (
+                          <div
+                            key={perm.id}
+                            className={`flex items-center gap-2 text-sm p-2 rounded ${
+                              isEnabled
+                                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                                : 'bg-gray-50 dark:bg-gray-800 text-gray-400'
+                            }`}
+                          >
                             <input
                               type="checkbox"
                               className="rounded"
-                              defaultChecked={selectedRole?.permissions.includes(perm.id)}
+                              checked={isEnabled}
+                              readOnly
+                              disabled
                             />
                             {perm.name}
-                          </label>
-                        ))}
-                      </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                );
+              })}
+            </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t dark:border-gray-700">
-                <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
-                <Button type="submit">{selectedRole ? 'Save Changes' : 'Create Role'}</Button>
-              </div>
-            </form>
+            <div className="mt-6 pt-4 border-t dark:border-gray-700 flex justify-end">
+              <Button variant="secondary" onClick={() => setShowModal(false)}>Close</Button>
+            </div>
           </Card>
         </div>
       )}

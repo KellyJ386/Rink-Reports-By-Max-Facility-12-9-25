@@ -1,33 +1,111 @@
-import Link from 'next/link';
+'use client';
 
-const stats = [
-  { name: 'Total Users', value: '2,543', change: '+12%', changeType: 'positive' },
-  { name: 'Active Facilities', value: '48', change: '+3', changeType: 'positive' },
-  { name: 'Forms Submitted', value: '12,847', change: '+8%', changeType: 'positive' },
-  { name: 'Open Incidents', value: '23', change: '-15%', changeType: 'negative' },
-];
+import { useState } from 'react';
+import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
+import { useAdminStatsLive } from '@/hooks';
+import {
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+} from '@heroicons/react/24/outline';
 
 const quickActions = [
-  { name: 'Add User', href: '/admin/users/new', icon: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z' },
-  { name: 'Add Facility', href: '/admin/facilities/new', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-  { name: 'View Reports', href: '/admin/reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  { name: 'Add User', href: '/admin/users', icon: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z' },
+  { name: 'Add Facility', href: '/admin/facilities', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+  { name: 'View Reports', href: '/dashboard/reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
   { name: 'System Settings', href: '/admin/settings', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
 ];
 
-const recentActivity = [
-  { id: 1, action: 'User created', user: 'John Smith', target: 'jane.doe@example.com', time: '5 minutes ago' },
-  { id: 2, action: 'Facility updated', user: 'Admin', target: 'Central Ice Arena', time: '1 hour ago' },
-  { id: 3, action: 'Role modified', user: 'Super Admin', target: 'Manager Role', time: '2 hours ago' },
-  { id: 4, action: 'System backup', user: 'System', target: 'Database', time: '6 hours ago' },
-  { id: 5, action: 'User deactivated', user: 'Admin', target: 'old.user@example.com', time: '1 day ago' },
+const REFRESH_OPTIONS = [
+  { label: 'Off', value: 0 },
+  { label: '10s', value: 10000 },
+  { label: '30s', value: 30000 },
+  { label: '1m', value: 60000 },
+  { label: '5m', value: 300000 },
 ];
 
 export default function AdminDashboard() {
+  const [refreshInterval, setRefreshInterval] = useState(30000);
+
+  const { data, isLoading, error, refetch, dataUpdatedAt } = useAdminStatsLive({
+    refreshInterval,
+    enabled: true,
+  });
+
+  const formatLastUpdated = () => {
+    if (!dataUpdatedAt) return 'Never';
+    return formatDistanceToNow(dataUpdatedAt, { addSuffix: true });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+          <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 animate-pulse">
+              <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
+              <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 p-4 rounded-lg">
+        <p className="font-medium">Failed to load admin stats</p>
+        <p className="text-sm mt-1">{error.message}</p>
+        <button
+          onClick={() => refetch()}
+          className="mt-2 text-sm underline hover:no-underline"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  const stats = data?.stats || [];
+  const recentActivity = data?.recentActivity || [];
+  const systemHealth = data?.systemHealth;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
-        <p className="text-gray-600 dark:text-gray-400">System overview and quick actions</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400">System overview and quick actions</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-500">
+            Updated {formatLastUpdated()}
+          </span>
+          <select
+            value={refreshInterval}
+            onChange={(e) => setRefreshInterval(Number(e.target.value))}
+            className="text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+          >
+            {REFRESH_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => refetch()}
+            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            title="Refresh now"
+          >
+            <ArrowPathIcon className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -44,7 +122,9 @@ export default function AdminDashboard() {
                 className={`text-sm font-medium ${
                   stat.changeType === 'positive'
                     ? 'text-green-600 dark:text-green-400'
-                    : 'text-red-600 dark:text-red-400'
+                    : stat.changeType === 'negative'
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-gray-500'
                 }`}
               >
                 {stat.change}
@@ -81,17 +161,34 @@ export default function AdminDashboard() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h2>
         </div>
         <div className="divide-y dark:divide-gray-700">
-          {recentActivity.map((activity) => (
-            <div key={activity.id} className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{activity.action}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {activity.user} → {activity.target}
-                </p>
-              </div>
-              <span className="text-xs text-gray-500 dark:text-gray-500">{activity.time}</span>
+          {recentActivity.length === 0 ? (
+            <div className="p-6 text-center text-gray-500">
+              No recent activity to display
             </div>
-          ))}
+          ) : (
+            recentActivity.map((activity) => (
+              <div key={activity.id} className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {activity.outcome === 'SUCCESS' ? (
+                    <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <ExclamationCircleIcon className="w-5 h-5 text-red-500" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">
+                      {activity.action}
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {activity.user} → {activity.target}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-500">
+                  {formatDistanceToNow(new Date(activity.time), { addSuffix: true })}
+                </span>
+              </div>
+            ))
+          )}
         </div>
         <div className="p-4 border-t dark:border-gray-700">
           <Link
@@ -108,67 +205,83 @@ export default function AdminDashboard() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">System Health</h2>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Database</span>
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                <span className="text-sm font-medium text-green-600 dark:text-green-400">Healthy</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">API Services</span>
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                <span className="text-sm font-medium text-green-600 dark:text-green-400">Operational</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Background Jobs</span>
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                <span className="text-sm font-medium text-green-600 dark:text-green-400">Running</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Email Service</span>
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                <span className="text-sm font-medium text-green-600 dark:text-green-400">Connected</span>
-              </span>
-            </div>
+            {systemHealth && Object.entries(systemHealth).map(([key, item]) => (
+              <div key={key} className="flex items-center justify-between">
+                <span className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                  {key === 'api' ? 'API Services' : key === 'jobs' ? 'Background Jobs' : key === 'email' ? 'Email Service' : key}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      item.status === 'healthy'
+                        ? 'bg-green-500'
+                        : item.status === 'degraded'
+                        ? 'bg-yellow-500'
+                        : 'bg-red-500'
+                    }`}
+                  />
+                  <span
+                    className={`text-sm font-medium ${
+                      item.status === 'healthy'
+                        ? 'text-green-600 dark:text-green-400'
+                        : item.status === 'degraded'
+                        ? 'text-yellow-600 dark:text-yellow-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Storage Usage</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Stats</h2>
           <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Database</span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">2.4 GB / 10 GB</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div className="bg-primary-600 h-2 rounded-full" style={{ width: '24%' }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-gray-600 dark:text-gray-400">File Storage</span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">8.7 GB / 50 GB</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div className="bg-primary-600 h-2 rounded-full" style={{ width: '17.4%' }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Backups</span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">15.2 GB / 100 GB</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div className="bg-primary-600 h-2 rounded-full" style={{ width: '15.2%' }}></div>
-              </div>
-            </div>
+            {data?.roleStats && (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Super Admins</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {data.roleStats.SUPER_ADMIN || 0}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Facility Admins</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {data.roleStats.FACILITY_ADMIN || 0}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Managers</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {data.roleStats.MANAGER || 0}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Ice Technicians</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {data.roleStats.ICE_TECHNICIAN || 0}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Staff Members</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {data.roleStats.STAFF || 0}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="mt-4 pt-4 border-t dark:border-gray-700">
+            <Link
+              href="/admin/roles"
+              className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              Manage roles & permissions →
+            </Link>
           </div>
         </div>
       </div>

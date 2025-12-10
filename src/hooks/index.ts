@@ -158,6 +158,10 @@ export type {
 
 // Admin hooks
 export {
+  useAdminStats,
+  useAdminStatsLive,
+  useRoleStats,
+  useRoleStatsLive,
   useUsers,
   useUsersLive,
   useCreateUser,
@@ -175,11 +179,15 @@ export {
   formatUserInitials,
   getUserFacilities,
   ROLE_LABELS,
+  ROLE_DESCRIPTIONS,
   ROLE_COLORS,
   AUDIT_ACTION_COLORS,
   SEVERITY_CONFIG,
 } from './useAdmin';
 export type {
+  AdminDashboardStat,
+  AdminDashboardStats,
+  SystemHealthItem,
   AdminUser,
   UserRole,
   CreateUserInput,

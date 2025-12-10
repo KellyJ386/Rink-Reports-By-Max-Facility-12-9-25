@@ -316,7 +316,122 @@ async function fetchAuditLogs(filter?: AuditLogFilter): Promise<{
   return response.json();
 }
 
+// ========== Admin Stats Types ==========
+
+export interface AdminDashboardStat {
+  name: string;
+  value: string;
+  activeCount?: number;
+  weekValue?: number;
+  change: string;
+  changeType: 'positive' | 'negative' | 'neutral';
+}
+
+export interface SystemHealthItem {
+  status: 'healthy' | 'degraded' | 'down';
+  label: string;
+}
+
+export interface AdminDashboardStats {
+  stats: AdminDashboardStat[];
+  roleStats: Record<UserRole, number>;
+  recentActivity: {
+    id: string;
+    action: string;
+    user: string;
+    target: string;
+    time: string;
+    outcome: 'SUCCESS' | 'FAILURE';
+  }[];
+  systemHealth: {
+    database: SystemHealthItem;
+    api: SystemHealthItem;
+    jobs: SystemHealthItem;
+    email: SystemHealthItem;
+  };
+}
+
+// ========== Admin Stats API Functions ==========
+
+async function fetchAdminStats(): Promise<AdminDashboardStats> {
+  const response = await fetch('/api/admin/stats');
+  if (!response.ok) {
+    throw new Error('Failed to fetch admin stats');
+  }
+  const data = await response.json();
+  return data.data;
+}
+
+async function fetchRoleStats(): Promise<{
+  roles: {
+    id: UserRole;
+    name: string;
+    description: string;
+    usersCount: number;
+    isSystem: boolean;
+  }[];
+}> {
+  const response = await fetch('/api/admin/stats');
+  if (!response.ok) {
+    throw new Error('Failed to fetch role stats');
+  }
+  const data = await response.json();
+
+  // Transform role stats into role objects with counts
+  const roleStats = data.data.roleStats as Record<string, number>;
+  const roles = Object.entries(ROLE_LABELS).map(([role, name]) => ({
+    id: role as UserRole,
+    name,
+    description: ROLE_DESCRIPTIONS[role as UserRole],
+    usersCount: roleStats[role] || 0,
+    isSystem: ['SUPER_ADMIN', 'FACILITY_ADMIN', 'MANAGER'].includes(role),
+  }));
+
+  return { roles };
+}
+
 // ========== React Query Hooks ==========
+
+// Admin Dashboard Stats Hooks
+export function useAdminStats() {
+  return useQuery({
+    queryKey: ['admin', 'stats'],
+    queryFn: fetchAdminStats,
+    staleTime: 30000,
+  });
+}
+
+export function useAdminStatsLive(options?: { refreshInterval?: number; enabled?: boolean }) {
+  const { refreshInterval = 0, enabled = true } = options || {};
+
+  return useQuery({
+    queryKey: ['admin', 'stats', 'live'],
+    queryFn: fetchAdminStats,
+    enabled,
+    refetchInterval: refreshInterval > 0 ? refreshInterval : false,
+    staleTime: 10000,
+  });
+}
+
+export function useRoleStats() {
+  return useQuery({
+    queryKey: ['admin', 'roles', 'stats'],
+    queryFn: fetchRoleStats,
+    staleTime: 60000,
+  });
+}
+
+export function useRoleStatsLive(options?: { refreshInterval?: number; enabled?: boolean }) {
+  const { refreshInterval = 0, enabled = true } = options || {};
+
+  return useQuery({
+    queryKey: ['admin', 'roles', 'stats', 'live'],
+    queryFn: fetchRoleStats,
+    enabled,
+    refetchInterval: refreshInterval > 0 ? refreshInterval : false,
+    staleTime: 30000,
+  });
+}
 
 // Users Hooks
 export function useUsers(params?: {
@@ -461,6 +576,15 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   SUPERVISOR: 'Supervisor',
   ICE_TECHNICIAN: 'Ice Technician',
   STAFF: 'Staff',
+};
+
+export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
+  SUPER_ADMIN: 'Full platform access with all permissions',
+  FACILITY_ADMIN: 'Full access to facility operations',
+  MANAGER: 'Manage daily operations and staff',
+  SUPERVISOR: 'Supervise shifts and team activities',
+  ICE_TECHNICIAN: 'Ice maintenance and monitoring',
+  STAFF: 'Basic operational access',
 };
 
 export const ROLE_COLORS: Record<UserRole, string> = {
