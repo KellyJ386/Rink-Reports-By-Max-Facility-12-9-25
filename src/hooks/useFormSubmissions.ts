@@ -192,7 +192,70 @@ async function createSubmission(
   return data.data;
 }
 
+// Create form
+async function createForm(data: {
+  facilityId: string;
+  name: string;
+  description?: string;
+  category: string;
+  fields: Array<{
+    id: string;
+    fieldType: string;
+    label: string;
+    placeholder?: string;
+    helpText?: string;
+    isRequired: boolean;
+    minValue?: number;
+    maxValue?: number;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+    options?: Array<{ value: string; label: string }>;
+    orderIndex: number;
+    sectionId?: string;
+    width?: 'full' | 'half' | 'third';
+    conditionalLogic?: {
+      showIf: {
+        fieldId: string;
+        operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than';
+        value: string | number | boolean;
+      };
+    };
+    defaultValue?: string;
+  }>;
+  includeWeather?: boolean;
+  includeTimestamp?: boolean;
+  includeUser?: boolean;
+  includeFacility?: boolean;
+}): Promise<FormTemplate> {
+  const response = await fetch('/api/forms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create form');
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
 // ========== Hooks ==========
+
+// Hook to create a form
+export function useCreateForm() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createForm,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
+    },
+  });
+}
 
 // Hook to fetch all forms
 export function useForms(params?: {
