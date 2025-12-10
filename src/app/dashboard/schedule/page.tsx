@@ -1,51 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { ScheduleCalendar, ShiftModal, Shift } from '@/components/scheduling';
+import { DraggableScheduleCalendar, ShiftModal, Shift } from '@/components/scheduling';
+import { useShifts, useMoveShift, useCreateShift, useTimeOffRequests, useReviewTimeOff } from '@/hooks';
 import {
   CalendarDaysIcon,
   ClockIcon,
   UserGroupIcon,
   PlusIcon,
+  ArrowPathIcon,
+  CheckIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
 
-// Mock data - in production this would come from API
-const mockShifts: Shift[] = [
-  {
-    id: '1',
-    userId: 'user1',
-    userName: 'John Smith',
-    shiftDate: new Date().toISOString(),
-    startTime: new Date(new Date().setHours(6, 0, 0)).toISOString(),
-    endTime: new Date(new Date().setHours(14, 0, 0)).toISOString(),
-    position: 'Ice Technician',
-    status: 'SCHEDULED',
-  },
-  {
-    id: '2',
-    userId: 'user2',
-    userName: 'Sarah Johnson',
-    shiftDate: new Date().toISOString(),
-    startTime: new Date(new Date().setHours(14, 0, 0)).toISOString(),
-    endTime: new Date(new Date().setHours(22, 0, 0)).toISOString(),
-    position: 'Front Desk',
-    status: 'CONFIRMED',
-  },
-  {
-    id: '3',
-    userId: 'user3',
-    userName: 'Mike Wilson',
-    shiftDate: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-    startTime: new Date(new Date().setHours(8, 0, 0)).toISOString(),
-    endTime: new Date(new Date().setHours(16, 0, 0)).toISOString(),
-    position: 'Zamboni Operator',
-    status: 'SCHEDULED',
-  },
-];
-
+// Mock employees - would come from API
 const mockEmployees = [
   { id: 'user1', name: 'John Smith' },
   { id: 'user2', name: 'Sarah Johnson' },
@@ -54,32 +26,116 @@ const mockEmployees = [
   { id: 'user5', name: 'David Lee' },
 ];
 
-const stats = [
-  {
-    name: 'Scheduled Shifts',
-    value: '24',
-    description: 'This week',
-    icon: CalendarDaysIcon,
-  },
-  {
-    name: 'Total Hours',
-    value: '168',
-    description: 'This week',
-    icon: ClockIcon,
-  },
-  {
-    name: 'Staff Available',
-    value: '8',
-    description: 'Active employees',
-    icon: UserGroupIcon,
-  },
-];
+// Generate mock shifts for demo
+const generateMockShifts = (): Shift[] => {
+  const shifts: Shift[] = [];
+  const today = new Date();
+  const positions = ['Ice Technician', 'Front Desk', 'Zamboni Operator', 'Maintenance', 'Manager'];
+  const statuses: Shift['status'][] = ['SCHEDULED', 'CONFIRMED', 'SCHEDULED'];
+
+  for (let dayOffset = -2; dayOffset <= 5; dayOffset++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() + dayOffset);
+
+    // Morning shift
+    if (Math.random() > 0.3) {
+      const emp = mockEmployees[Math.floor(Math.random() * mockEmployees.length)];
+      const startTime = new Date(date);
+      startTime.setHours(6, 0, 0, 0);
+      const endTime = new Date(date);
+      endTime.setHours(14, 0, 0, 0);
+
+      shifts.push({
+        id: `shift-${dayOffset}-am`,
+        userId: emp.id,
+        userName: emp.name,
+        shiftDate: date.toISOString(),
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        position: positions[Math.floor(Math.random() * positions.length)],
+        status: dayOffset < 0 ? 'COMPLETED' : statuses[Math.floor(Math.random() * statuses.length)],
+      });
+    }
+
+    // Afternoon shift
+    if (Math.random() > 0.2) {
+      const emp = mockEmployees[Math.floor(Math.random() * mockEmployees.length)];
+      const startTime = new Date(date);
+      startTime.setHours(14, 0, 0, 0);
+      const endTime = new Date(date);
+      endTime.setHours(22, 0, 0, 0);
+
+      shifts.push({
+        id: `shift-${dayOffset}-pm`,
+        userId: emp.id,
+        userName: emp.name,
+        shiftDate: date.toISOString(),
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        position: positions[Math.floor(Math.random() * positions.length)],
+        status: dayOffset < 0 ? 'COMPLETED' : statuses[Math.floor(Math.random() * statuses.length)],
+      });
+    }
+  }
+
+  return shifts;
+};
+
+const mockShifts = generateMockShifts();
 
 export default function SchedulePage() {
   const [shifts, setShifts] = useState<Shift[]>(mockShifts);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  // Calculate dynamic stats
+  const stats = useMemo(() => {
+    const today = new Date();
+    const weekStartDate = startOfWeek(today, { weekStartsOn: 0 });
+    const weekEndDate = endOfWeek(today, { weekStartsOn: 0 });
+
+    const weekShifts = shifts.filter((s) => {
+      const shiftDate = new Date(s.shiftDate);
+      return shiftDate >= weekStartDate && shiftDate <= weekEndDate;
+    });
+
+    const totalHours = weekShifts.reduce((sum, s) => {
+      const start = new Date(s.startTime);
+      const end = new Date(s.endTime);
+      return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    }, 0);
+
+    return [
+      {
+        name: 'Scheduled Shifts',
+        value: weekShifts.length.toString(),
+        description: 'This week',
+        icon: CalendarDaysIcon,
+      },
+      {
+        name: 'Total Hours',
+        value: Math.round(totalHours).toString(),
+        description: 'This week',
+        icon: ClockIcon,
+      },
+      {
+        name: 'Staff Available',
+        value: mockEmployees.length.toString(),
+        description: 'Active employees',
+        icon: UserGroupIcon,
+      },
+    ];
+  }, [shifts]);
+
+  // Today's shifts
+  const todayShifts = useMemo(() => {
+    const today = new Date();
+    return shifts.filter((s) => {
+      const shiftDate = new Date(s.shiftDate);
+      return shiftDate.toDateString() === today.toDateString();
+    });
+  }, [shifts]);
 
   const handleAddShift = (date: Date) => {
     setSelectedShift(null);
@@ -90,6 +146,32 @@ export default function SchedulePage() {
   const handleEditShift = (shift: Shift) => {
     setSelectedShift(shift);
     setIsModalOpen(true);
+  };
+
+  const handleMoveShift = (shiftId: string, newDate: string) => {
+    setShifts((prev) =>
+      prev.map((shift) => {
+        if (shift.id !== shiftId) return shift;
+
+        // Parse the original times
+        const oldStart = new Date(shift.startTime);
+        const oldEnd = new Date(shift.endTime);
+
+        // Create new date objects preserving the time
+        const newDateObj = new Date(newDate);
+        const newStart = new Date(newDateObj);
+        newStart.setHours(oldStart.getHours(), oldStart.getMinutes(), 0, 0);
+        const newEnd = new Date(newDateObj);
+        newEnd.setHours(oldEnd.getHours(), oldEnd.getMinutes(), 0, 0);
+
+        return {
+          ...shift,
+          shiftDate: newDateObj.toISOString(),
+          startTime: newStart.toISOString(),
+          endTime: newEnd.toISOString(),
+        };
+      })
+    );
   };
 
   const handleSaveShift = async (data: {
@@ -151,12 +233,13 @@ export default function SchedulePage() {
         ))}
       </div>
 
-      {/* Calendar */}
+      {/* Drag-and-Drop Calendar */}
       <Card>
-        <ScheduleCalendar
+        <DraggableScheduleCalendar
           shifts={shifts}
           onAddShift={handleAddShift}
           onEditShift={handleEditShift}
+          onMoveShift={handleMoveShift}
           isEditable={true}
         />
       </Card>
@@ -166,13 +249,7 @@ export default function SchedulePage() {
         <Card>
           <h3 className="text-lg font-semibold text-rink-900 mb-4">Today's Shifts</h3>
           <div className="space-y-3">
-            {shifts
-              .filter((s) => {
-                const shiftDate = new Date(s.shiftDate);
-                const today = new Date();
-                return shiftDate.toDateString() === today.toDateString();
-              })
-              .map((shift) => (
+            {todayShifts.map((shift) => (
                 <div
                   key={shift.id}
                   className="flex items-center justify-between p-3 bg-rink-50 rounded-lg"
@@ -216,11 +293,7 @@ export default function SchedulePage() {
                   </div>
                 </div>
               ))}
-            {shifts.filter((s) => {
-              const shiftDate = new Date(s.shiftDate);
-              const today = new Date();
-              return shiftDate.toDateString() === today.toDateString();
-            }).length === 0 && (
+            {todayShifts.length === 0 && (
               <p className="text-center text-rink-500 py-4">
                 No shifts scheduled for today
               </p>
