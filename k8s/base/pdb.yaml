@@ -1,0 +1,27 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mfo-web-pdb
+  namespace: mfo
+  labels:
+    app.kubernetes.io/name: max-facility-operations
+spec:
+  # Ensure at least 2 pods are always available during disruptions
+  minAvailable: 2
+  # Alternative: maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: max-facility-operations
+      app.kubernetes.io/component: web
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mfo-worker-pdb
+  namespace: mfo
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: max-facility-operations
+      app.kubernetes.io/component: worker

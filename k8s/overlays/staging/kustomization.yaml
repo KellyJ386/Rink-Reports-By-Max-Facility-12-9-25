@@ -1,0 +1,60 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: mfo-staging
+
+namePrefix: staging-
+
+resources:
+  - ../../base
+
+commonLabels:
+  environment: staging
+
+patches:
+  # Staging replicas
+  - target:
+      kind: Deployment
+      name: mfo-web
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  - target:
+      kind: Deployment
+      name: mfo-worker
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+
+  # HPA settings for staging
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: mfo-web-hpa
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 2
+      - op: replace
+        path: /spec/maxReplicas
+        value: 5
+
+  # Update ingress host for staging
+  - target:
+      kind: Ingress
+      name: mfo-ingress
+    patch: |
+      - op: replace
+        path: /spec/rules/0/host
+        value: staging.maxfacility.com
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: staging.maxfacility.com
+
+configMapGenerator:
+  - name: mfo-config
+    behavior: merge
+    literals:
+      - NODE_ENV=staging
+      - LOG_LEVEL=info

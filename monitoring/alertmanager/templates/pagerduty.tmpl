@@ -1,0 +1,30 @@
+{{ define "pagerduty.description" }}
+{{ if .CommonAnnotations.summary }}
+{{ .CommonAnnotations.summary }}
+{{ else }}
+{{ .GroupLabels.alertname }}: {{ .Alerts.Firing | len }} firing, {{ .Alerts.Resolved | len }} resolved
+{{ end }}
+{{ end }}
+
+{{ define "pagerduty.firing" }}
+{{ range .Alerts.Firing }}
+Alert: {{ .Labels.alertname }}
+Summary: {{ .Annotations.summary }}
+Description: {{ .Annotations.description }}
+Severity: {{ .Labels.severity }}
+{{ if .Labels.instance }}Instance: {{ .Labels.instance }}{{ end }}
+{{ if .Labels.pod }}Pod: {{ .Labels.pod }}{{ end }}
+{{ if .Labels.container }}Container: {{ .Labels.container }}{{ end }}
+Started: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+---
+{{ end }}
+{{ end }}
+
+{{ define "pagerduty.resolved" }}
+{{ range .Alerts.Resolved }}
+Alert: {{ .Labels.alertname }}
+Summary: {{ .Annotations.summary }}
+Resolved: {{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}
+---
+{{ end }}
+{{ end }}
