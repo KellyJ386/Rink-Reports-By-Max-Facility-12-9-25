@@ -92,11 +92,55 @@ export interface IceDepthPoint {
   x: number;
   y: number;
   depth: number | null;
+  label?: string; // Optional custom label for the point
 }
 
 export interface IceDepthConfig {
-  points: 25 | 35 | 47;
+  points: number; // Now supports any number of points
   layout: IceDepthPoint[];
+}
+
+// Custom Diagram Configuration
+export interface CustomDiagramConfig {
+  id: string;
+  name: string;
+  description?: string;
+  rinkType: 'standard' | 'olympic' | 'recreational' | 'curling' | 'custom';
+  dimensions: {
+    length: number; // feet
+    width: number;  // feet
+  };
+  points: IceDepthPoint[];
+  createdAt: Date;
+  updatedAt: Date;
+  isDefault?: boolean;
+}
+
+// Preset diagram types
+export type PresetDiagramType = '25-point' | '35-point' | '47-point' | 'custom';
+
+// Bluetooth Device types for ice depth measurement
+export interface BluetoothDevice {
+  id: string;
+  name: string;
+  connected: boolean;
+  batteryLevel?: number;
+  lastReading?: number;
+  lastReadingTime?: Date;
+}
+
+export interface BluetoothReading {
+  deviceId: string;
+  value: number;
+  unit: 'inches' | 'mm' | 'cm';
+  timestamp: Date;
+  signalStrength?: number;
+}
+
+export interface BluetoothConnectionState {
+  status: 'disconnected' | 'connecting' | 'connected' | 'error';
+  device: BluetoothDevice | null;
+  error?: string;
 }
 
 // Incident Report types

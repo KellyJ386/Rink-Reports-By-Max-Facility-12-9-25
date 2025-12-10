@@ -2,19 +2,22 @@
 
 import { useState, useCallback } from 'react';
 import clsx from 'clsx';
-import { IceDepthPoint } from '@/types';
+import { IceDepthPoint, CustomDiagramConfig } from '@/types';
 
 interface RinkDiagramProps {
-  pointsConfig: 25 | 35 | 47;
+  pointsConfig?: number; // Now supports any number
+  customConfig?: CustomDiagramConfig; // Custom diagram configuration
   points: IceDepthPoint[];
   selectedPointId: string | null;
   onPointSelect: (pointId: string) => void;
   onPointUpdate: (pointId: string, depth: number) => void;
   readOnly?: boolean;
+  showLabels?: boolean; // Option to show point labels
+  rinkType?: 'standard' | 'olympic' | 'recreational' | 'curling' | 'custom';
 }
 
 // Generate point layouts for different configurations
-function generatePoints(config: 25 | 35 | 47): IceDepthPoint[] {
+function generatePoints(config: number, rinkType: string = 'standard'): IceDepthPoint[] {
   const points: IceDepthPoint[] = [];
 
   if (config === 25) {
@@ -26,6 +29,7 @@ function generatePoints(config: 25 | 35 | 47): IceDepthPoint[] {
           x: 10 + col * 20,
           y: 10 + row * 20,
           depth: null,
+          label: `${String.fromCharCode(65 + row)}${col + 1}`,
         });
       }
     }
@@ -38,10 +42,11 @@ function generatePoints(config: 25 | 35 | 47): IceDepthPoint[] {
           x: 7 + col * 14.3,
           y: 10 + row * 20,
           depth: null,
+          label: `${String.fromCharCode(65 + row)}${col + 1}`,
         });
       }
     }
-  } else {
+  } else if (config === 47) {
     // 47-point custom layout (NHL-style with curves)
     // Center line points
     for (let i = 0; i < 5; i++) {
@@ -50,6 +55,7 @@ function generatePoints(config: 25 | 35 | 47): IceDepthPoint[] {
         x: 50,
         y: 10 + i * 20,
         depth: null,
+        label: `C${i + 1}`,
       });
     }
     // Goal crease areas (extra points)
@@ -60,6 +66,7 @@ function generatePoints(config: 25 | 35 | 47): IceDepthPoint[] {
           x,
           y: 35 + i * 15,
           depth: null,
+          label: `G${idx === 0 ? 'L' : 'R'}${i + 1}`,
         });
       }
     });
@@ -72,8 +79,29 @@ function generatePoints(config: 25 | 35 | 47): IceDepthPoint[] {
             x: 7 + col * 14.3,
             y: 10 + row * 20,
             depth: null,
+            label: `${String.fromCharCode(65 + row)}${col < 3 ? col + 1 : col}`,
           });
         }
+      }
+    }
+  } else {
+    // Custom grid - calculate optimal rows/cols
+    const aspectRatio = rinkType === 'curling' ? 9.4 : 2.35; // Length/width ratio
+    const cols = Math.ceil(Math.sqrt(config * aspectRatio));
+    const rows = Math.ceil(config / cols);
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const idx = row * cols + col;
+        if (idx >= config) break;
+
+        points.push({
+          pointId: `p${idx + 1}`,
+          x: 5 + (col / (cols - 1 || 1)) * 90,
+          y: 5 + (row / (rows - 1 || 1)) * 90,
+          depth: null,
+          label: `${String.fromCharCode(65 + row)}${col + 1}`,
+        });
       }
     }
   }
@@ -104,17 +132,27 @@ function getDepthColor(depth: number | null): string {
 }
 
 export function RinkDiagram({
-  pointsConfig,
+  pointsConfig = 25,
+  customConfig,
   points: initialPoints,
   selectedPointId,
   onPointSelect,
   onPointUpdate,
   readOnly = false,
+  showLabels = false,
+  rinkType = 'standard',
 }: RinkDiagramProps) {
   const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
 
-  // Use provided points or generate defaults
-  const points = initialPoints.length > 0 ? initialPoints : generatePoints(pointsConfig);
+  // Use provided points, custom config points, or generate defaults
+  const points = customConfig?.points?.length
+    ? customConfig.points
+    : initialPoints.length > 0
+      ? initialPoints
+      : generatePoints(pointsConfig, rinkType);
+
+  // Determine rink type for rendering
+  const effectiveRinkType = customConfig?.rinkType || rinkType;
 
   return (
     <div className="relative w-full aspect-[2/1] max-w-4xl mx-auto">
@@ -276,9 +314,17 @@ export function RinkDiagram({
   );
 }
 
-// Hook for managing ice depth readings
-export function useIceDepthPoints(config: 25 | 35 | 47) {
-  const [points, setPoints] = useState<IceDepthPoint[]>(() => generatePoints(config));
+// Hook for managing ice depth readings - supports custom configurations
+export function useIceDepthPoints(
+  config: number | CustomDiagramConfig,
+  rinkType: string = 'standard'
+) {
+  const [points, setPoints] = useState<IceDepthPoint[]>(() => {
+    if (typeof config === 'object' && config.points) {
+      return config.points.map(p => ({ ...p }));
+    }
+    return generatePoints(config as number, rinkType);
+  });
 
   const updatePoint = useCallback((pointId: string, depth: number) => {
     setPoints((prev) =>
@@ -287,13 +333,21 @@ export function useIceDepthPoints(config: 25 | 35 | 47) {
   }, []);
 
   const resetPoints = useCallback(() => {
-    setPoints(generatePoints(config));
-  }, [config]);
+    if (typeof config === 'object' && config.points) {
+      setPoints(config.points.map(p => ({ ...p, depth: null })));
+    } else {
+      setPoints(generatePoints(config as number, rinkType));
+    }
+  }, [config, rinkType]);
+
+  const loadCustomConfig = useCallback((customConfig: CustomDiagramConfig) => {
+    setPoints(customConfig.points.map(p => ({ ...p, depth: null })));
+  }, []);
 
   const getStats = useCallback(() => {
     const measuredPoints = points.filter((p) => p.depth !== null);
     if (measuredPoints.length === 0) {
-      return { average: null, min: null, max: null, variance: null };
+      return { average: null, min: null, max: null, variance: null, measuredCount: 0, totalCount: points.length };
     }
 
     const depths = measuredPoints.map((p) => p.depth!);
@@ -303,10 +357,57 @@ export function useIceDepthPoints(config: 25 | 35 | 47) {
     const variance =
       depths.reduce((acc, d) => acc + Math.pow(d - average, 2), 0) / depths.length;
 
-    return { average, min, max, variance };
+    return {
+      average,
+      min,
+      max,
+      variance,
+      measuredCount: measuredPoints.length,
+      totalCount: points.length,
+    };
   }, [points]);
 
-  return { points, updatePoint, resetPoints, getStats };
+  // Get points by zone (for zone-based analysis)
+  const getPointsByZone = useCallback(() => {
+    const zones = {
+      goalLeft: points.filter(p => p.x < 20),
+      leftWing: points.filter(p => p.x >= 20 && p.x < 40),
+      center: points.filter(p => p.x >= 40 && p.x < 60),
+      rightWing: points.filter(p => p.x >= 60 && p.x < 80),
+      goalRight: points.filter(p => p.x >= 80),
+    };
+    return zones;
+  }, [points]);
+
+  return {
+    points,
+    updatePoint,
+    resetPoints,
+    loadCustomConfig,
+    getStats,
+    getPointsByZone,
+  };
+}
+
+// Generate points for a custom grid configuration
+export function generateCustomGrid(rows: number, cols: number): IceDepthPoint[] {
+  const points: IceDepthPoint[] = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const xPadding = 8;
+      const yPadding = 8;
+      const xSpacing = (100 - 2 * xPadding) / Math.max(cols - 1, 1);
+      const ySpacing = (100 - 2 * yPadding) / Math.max(rows - 1, 1);
+      points.push({
+        pointId: `p${row * cols + col + 1}`,
+        x: cols === 1 ? 50 : xPadding + col * xSpacing,
+        y: rows === 1 ? 50 : yPadding + row * ySpacing,
+        depth: null,
+        label: `${String.fromCharCode(65 + row)}${col + 1}`,
+      });
+    }
+  }
+  return points;
 }
 
 export { generatePoints };

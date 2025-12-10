@@ -176,6 +176,7 @@ model Rink {
   iceDepthReadings IceDepthReading[]
   iceMakeLogs     IceMakeLog[]
   zamboniLogs     ZamboniLog[]
+  customDiagrams  CustomDiagram[]
 
   @@index([facilityId])
 }
@@ -186,6 +187,37 @@ enum RinkType {
   RECREATIONAL
   CURLING
   CUSTOM
+}
+
+// Custom Ice Depth Diagram Configuration
+model CustomDiagram {
+  id              String   @id @default(cuid())
+  rinkId          String
+  createdById     String
+
+  name            String
+  description     String?
+  diagramType     RinkType @default(CUSTOM)
+
+  // Dimensions
+  length          Float    @default(200)  // in feet
+  width           Float    @default(85)   // in feet
+
+  // Point configuration stored as JSON
+  // Array of { pointId, x, y, label }
+  pointsConfig    Json
+
+  isDefault       Boolean  @default(false)
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  rink            Rink     @relation(fields: [rinkId], references: [id], onDelete: Cascade)
+
+  @@index([rinkId])
+  @@index([createdById])
 }
 
 // Junction table for User-Facility access
