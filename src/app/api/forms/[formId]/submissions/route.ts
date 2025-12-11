@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { processFormActions } from '@/lib/forms/actions';
 
 // Schema for form submission
 const submissionSchema = z.object({
@@ -292,8 +293,27 @@ export async function POST(
       },
     });
 
+    // Process form actions (triggers for alerts and notifications)
+    const { actionsTriggered, errors: actionErrors } = await processFormActions(
+      formId,
+      facilityUser.facilityId,
+      submission.id,
+      fieldResponses,
+      session.user.id
+    );
+
+    // Log any action errors (non-blocking)
+    if (actionErrors.length > 0) {
+      console.warn('Form action errors:', actionErrors);
+    }
+
     return NextResponse.json(
-      { success: true, data: submission },
+      {
+        success: true,
+        data: submission,
+        actionsTriggered,
+        actionErrors: actionErrors.length > 0 ? actionErrors : undefined,
+      },
       { status: 201 }
     );
   } catch (error) {
