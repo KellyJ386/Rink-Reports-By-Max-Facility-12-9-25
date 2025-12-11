@@ -245,9 +245,6 @@ async function exportAirQuality(
 
   const readings = await prisma.airQualityLog.findMany({
     where,
-    include: {
-      recordedBy: { select: { name: true } },
-    },
     orderBy: { recordedAt: 'desc' },
     take: params.limit,
   });
@@ -260,7 +257,6 @@ async function exportAirQuality(
     { key: 'temperature', header: 'Temperature (°F)', formatter: (v) => formatNumberForCSV(v as number, 1) },
     { key: 'humidity', header: 'Humidity (%)', formatter: (v) => formatNumberForCSV(v as number, 0) },
     { key: 'thresholdExceeded', header: 'Threshold Exceeded', formatter: (v) => formatBooleanForCSV(v as boolean) },
-    { key: 'recordedBy.name', header: 'Recorded By' },
     { key: 'notes', header: 'Notes' },
   ];
 
@@ -283,9 +279,6 @@ async function exportRefrigeration(
 
   const readings = await prisma.refrigerationLog.findMany({
     where,
-    include: {
-      recordedBy: { select: { name: true } },
-    },
     orderBy: { recordedAt: 'desc' },
     take: params.limit,
   });
@@ -298,7 +291,6 @@ async function exportRefrigeration(
     { key: 'suctionPressure', header: 'Suction PSI', formatter: (v) => formatNumberForCSV(v as number, 1) },
     { key: 'dischargePressure', header: 'Discharge PSI', formatter: (v) => formatNumberForCSV(v as number, 1) },
     { key: 'oilLevel', header: 'Oil Level' },
-    { key: 'recordedBy.name', header: 'Recorded By' },
     { key: 'notes', header: 'Notes' },
   ];
 
@@ -441,7 +433,8 @@ async function exportAlerts(
 ) {
   const where: Record<string, unknown> = {};
   if (params.facilityId) where.facilityId = params.facilityId;
-  if (params.status) where.status = params.status;
+  if (params.status === 'acknowledged') where.isAcknowledged = true;
+  if (params.status === 'pending') where.isAcknowledged = false;
   if (Object.keys(dateFilter).length > 0) {
     where.createdAt = dateFilter;
   }
@@ -450,29 +443,52 @@ async function exportAlerts(
     where,
     include: {
       facility: { select: { name: true } },
-      acknowledgedBy: { select: { name: true } },
-      resolvedBy: { select: { name: true } },
+      acknowledgments: {
+        include: {
+          alert: false,
+        },
+        orderBy: { acknowledgedAt: 'desc' },
+        take: 1,
+      },
     },
     orderBy: { createdAt: 'desc' },
     take: params.limit,
   });
 
+  // Transform data for export
+  const transformedAlerts = await Promise.all(
+    alerts.map(async (alert) => {
+      let acknowledgerName = null;
+      if (alert.acknowledgedById) {
+        const acknowledger = await prisma.user.findUnique({
+          where: { id: alert.acknowledgedById },
+          select: { name: true },
+        });
+        acknowledgerName = acknowledger?.name;
+      }
+      return {
+        ...alert,
+        acknowledgerName,
+        status: alert.isAcknowledged ? 'Acknowledged' : 'Pending',
+      };
+    })
+  );
+
   const columns: CSVColumn<Record<string, unknown>>[] = [
     { key: 'createdAt', header: 'Created At', formatter: (v) => formatDateForCSV(v as Date) },
     { key: 'facility.name', header: 'Facility' },
-    { key: 'type', header: 'Type' },
+    { key: 'alertType', header: 'Type' },
     { key: 'severity', header: 'Severity' },
-    { key: 'title', header: 'Title' },
     { key: 'message', header: 'Message' },
+    { key: 'threshold', header: 'Threshold', formatter: (v) => formatNumberForCSV(v as number, 2) },
+    { key: 'actualValue', header: 'Actual Value', formatter: (v) => formatNumberForCSV(v as number, 2) },
     { key: 'status', header: 'Status' },
-    { key: 'acknowledgedBy.name', header: 'Acknowledged By' },
+    { key: 'acknowledgerName', header: 'Acknowledged By' },
     { key: 'acknowledgedAt', header: 'Acknowledged At', formatter: (v) => formatDateForCSV(v as Date) },
-    { key: 'resolvedBy.name', header: 'Resolved By' },
-    { key: 'resolvedAt', header: 'Resolved At', formatter: (v) => formatDateForCSV(v as Date) },
   ];
 
   return {
-    data: alerts,
+    data: transformedAlerts,
     columns,
     filename: generateExportFilename('alerts'),
   };

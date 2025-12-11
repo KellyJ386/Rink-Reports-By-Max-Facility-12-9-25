@@ -98,13 +98,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       case 'air_quality': {
-        const readings = await prisma.airQualityReading.findMany({
+        const readings = await prisma.airQualityLog.findMany({
           where: {
             facilityId: scheduledReport.facilityId,
             recordedAt: { gte: startDate, lte: endDate },
-          },
-          include: {
-            recordedBy: { select: { name: true } },
           },
           orderBy: { recordedAt: 'desc' },
         });
@@ -115,10 +112,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           { key: 'location', header: 'Location' },
           { key: 'co2Level', header: 'CO2 (ppm)', formatter: (v) => formatNumberForCSV(v as number) },
           { key: 'coLevel', header: 'CO (ppm)', formatter: (v) => formatNumberForCSV(v as number, 1) },
-          { key: 'no2Level', header: 'NO2 (ppm)', formatter: (v) => formatNumberForCSV(v as number, 2) },
           { key: 'temperature', header: 'Temp (°F)', formatter: (v) => formatNumberForCSV(v as number, 1) },
           { key: 'humidity', header: 'Humidity (%)', formatter: (v) => formatNumberForCSV(v as number) },
-          { key: 'recordedBy.name', header: 'Recorded By' },
+          { key: 'thresholdExceeded', header: 'Threshold Exceeded', formatter: (v) => v ? 'Yes' : 'No' },
         ];
         break;
       }
@@ -129,20 +125,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             facilityId: scheduledReport.facilityId,
             recordedAt: { gte: startDate, lte: endDate },
           },
-          include: {
-            recordedBy: { select: { name: true } },
-          },
           orderBy: { recordedAt: 'desc' },
         });
         data = logs;
         recordCount = logs.length;
         columns = [
           { key: 'recordedAt', header: 'Date/Time', formatter: (v) => formatDateForCSV(v as Date) },
-          { key: 'compressor1Suction', header: 'Comp1 Suction', formatter: (v) => formatNumberForCSV(v as number, 1) },
-          { key: 'compressor1Discharge', header: 'Comp1 Discharge', formatter: (v) => formatNumberForCSV(v as number, 1) },
-          { key: 'brineSupply', header: 'Brine Supply', formatter: (v) => formatNumberForCSV(v as number, 1) },
-          { key: 'brineReturn', header: 'Brine Return', formatter: (v) => formatNumberForCSV(v as number, 1) },
-          { key: 'recordedBy.name', header: 'Recorded By' },
+          { key: 'brineSupplyTemp', header: 'Brine Supply (°F)', formatter: (v) => formatNumberForCSV(v as number, 1) },
+          { key: 'brineReturnTemp', header: 'Brine Return (°F)', formatter: (v) => formatNumberForCSV(v as number, 1) },
+          { key: 'suctionPressure', header: 'Suction PSI', formatter: (v) => formatNumberForCSV(v as number, 1) },
+          { key: 'dischargePressure', header: 'Discharge PSI', formatter: (v) => formatNumberForCSV(v as number, 1) },
+          { key: 'compressorStatus', header: 'Compressor Status' },
         ];
         break;
       }

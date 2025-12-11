@@ -29,7 +29,7 @@ export async function GET(
         formTemplate: {
           include: {
             fields: {
-              orderBy: { order: 'asc' },
+              orderBy: { orderIndex: 'asc' },
             },
             facility: {
               select: {
@@ -46,7 +46,7 @@ export async function GET(
         },
         fieldResponses: {
           include: {
-            field: true,
+            formField: true,
           },
         },
         attachments: true,
@@ -74,9 +74,9 @@ export async function GET(
       let formattedValue = response.value;
 
       // Parse JSON values for complex field types
-      if (response.field.type === 'CHECKBOX' || response.field.type === 'MULTI_SELECT') {
+      if (response.formField.fieldType === 'CHECKBOX' || response.formField.fieldType === 'MULTI_SELECT') {
         try {
-          const parsed = JSON.parse(response.value);
+          const parsed = JSON.parse(response.value || '');
           formattedValue = Array.isArray(parsed) ? parsed.join(', ') : response.value;
         } catch {
           // Keep original value if not JSON
@@ -88,15 +88,15 @@ export async function GET(
       if (response.value === 'false') formattedValue = 'No';
 
       return {
-        fieldId: response.fieldId,
-        fieldLabel: response.field.label,
-        fieldType: response.field.type,
+        fieldId: response.formFieldId,
+        fieldLabel: response.formField.label,
+        fieldType: response.formField.fieldType,
         value: response.value,
         formattedValue,
-        isRequired: response.field.required,
-        order: response.field.order,
+        isRequired: response.formField.isRequired,
+        orderIndex: response.formField.orderIndex,
       };
-    }).sort((a, b) => a.order - b.order);
+    }).sort((a, b) => a.orderIndex - b.orderIndex);
 
     // Build export data
     const exportData = {
@@ -115,9 +115,9 @@ export async function GET(
       responses: formattedResponses,
       attachments: submission.attachments.map((a) => ({
         id: a.id,
-        filename: a.filename,
-        mimeType: a.mimeType,
-        size: a.size,
+        fileName: a.fileName,
+        fileType: a.fileType,
+        fileSize: a.fileSize,
       })),
     };
 
@@ -165,7 +165,7 @@ function generatePrintableHTML(data: {
     fieldType: string;
     formattedValue: string;
   }>;
-  attachments: Array<{ filename: string }>;
+  attachments: Array<{ fileName: string }>;
 }): string {
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleString('en-US', {
@@ -382,7 +382,7 @@ function generatePrintableHTML(data: {
   <div class="responses-section">
     <h2>Attachments</h2>
     <ul>
-      ${data.attachments.map((a) => `<li>${escapeHtml(a.filename)}</li>`).join('')}
+      ${data.attachments.map((a) => `<li>${escapeHtml(a.fileName)}</li>`).join('')}
     </ul>
   </div>
   ` : ''}
