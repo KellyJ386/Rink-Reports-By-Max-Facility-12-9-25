@@ -1,85 +1,90 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import {
   BellIcon,
   EnvelopeIcon,
   DevicePhoneMobileIcon,
   ComputerDesktopIcon,
   MoonIcon,
+  CheckCircleIcon,
+  CalendarDaysIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { toast } from '@/components/notifications';
-
-interface NotificationSettings {
-  channels: {
-    inApp: boolean;
-    email: boolean;
-    push: boolean;
-    sms: boolean;
-  };
-  categories: {
-    incidents: boolean;
-    iceDepth: boolean;
-    schedule: boolean;
-    maintenance: boolean;
-    system: boolean;
-  };
-  quietHours: {
-    enabled: boolean;
-    start: string;
-    end: string;
-  };
-  digest: 'instant' | 'hourly' | 'daily' | 'weekly';
-}
+import { useUserPreferences, useUpdateUserPreferences, TIME_OPTIONS } from '@/hooks';
 
 export default function NotificationSettingsPage() {
-  const [settings, setSettings] = useState<NotificationSettings>({
-    channels: {
-      inApp: true,
-      email: true,
-      push: false,
-      sms: false,
-    },
-    categories: {
-      incidents: true,
-      iceDepth: true,
-      schedule: true,
-      maintenance: true,
-      system: true,
-    },
-    quietHours: {
-      enabled: false,
-      start: '22:00',
-      end: '07:00',
-    },
-    digest: 'instant',
-  });
+  const { data: prefs, isLoading } = useUserPreferences();
+  const updateMutation = useUpdateUserPreferences();
 
-  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    emailEnabled: true,
+    smsEnabled: false,
+    pushEnabled: true,
+    quietHoursEnabled: false,
+    quietHoursStart: '22:00',
+    quietHoursEnd: '07:00',
+    dailyDigestEnabled: false,
+    dailyDigestTime: '05:00',
+    digestIncludeAlerts: true,
+    digestIncludeForms: true,
+    digestIncludeIncidents: true,
+    digestIncludeReadings: true,
+  });
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Initialize form data from fetched preferences
+  useEffect(() => {
+    if (prefs) {
+      setFormData({
+        emailEnabled: prefs.emailEnabled,
+        smsEnabled: prefs.smsEnabled,
+        pushEnabled: prefs.pushEnabled,
+        quietHoursEnabled: prefs.quietHoursEnabled,
+        quietHoursStart: prefs.quietHoursStart,
+        quietHoursEnd: prefs.quietHoursEnd,
+        dailyDigestEnabled: prefs.dailyDigestEnabled,
+        dailyDigestTime: prefs.dailyDigestTime,
+        digestIncludeAlerts: prefs.digestIncludeAlerts,
+        digestIncludeForms: prefs.digestIncludeForms,
+        digestIncludeIncidents: prefs.digestIncludeIncidents,
+        digestIncludeReadings: prefs.digestIncludeReadings,
+      });
+      setHasChanges(false);
+    }
+  }, [prefs]);
+
+  const handleChange = (field: keyof typeof formData, value: boolean | string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setHasChanges(true);
+  };
 
   const handleSave = async () => {
-    setSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setSaving(false);
-    toast.success('Settings Saved', 'Your notification preferences have been updated.');
+    try {
+      await updateMutation.mutateAsync(formData);
+      setHasChanges(false);
+      toast.success('Settings Saved', 'Your notification preferences have been updated.');
+    } catch (err) {
+      toast.error('Save Failed', 'Failed to save notification preferences.');
+    }
   };
 
-  const updateChannel = (channel: keyof NotificationSettings['channels'], value: boolean) => {
-    setSettings((prev) => ({
-      ...prev,
-      channels: { ...prev.channels, [channel]: value },
-    }));
-  };
-
-  const updateCategory = (category: keyof NotificationSettings['categories'], value: boolean) => {
-    setSettings((prev) => ({
-      ...prev,
-      categories: { ...prev.categories, [category]: value },
-    }));
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-6 max-w-3xl">
+        <div className="animate-pulse">
+          <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+          <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded" />
+        </div>
+        <Card className="animate-pulse">
+          <div className="h-64 bg-gray-100 dark:bg-gray-800 rounded" />
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -114,8 +119,8 @@ export default function NotificationSettingsPage() {
               <input
                 type="checkbox"
                 className="sr-only peer"
-                checked={settings.channels.inApp}
-                onChange={(e) => updateChannel('inApp', e.target.checked)}
+                checked={formData.pushEnabled}
+                onChange={(e) => handleChange('pushEnabled', e.target.checked)}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
             </label>
@@ -135,8 +140,8 @@ export default function NotificationSettingsPage() {
               <input
                 type="checkbox"
                 className="sr-only peer"
-                checked={settings.channels.email}
-                onChange={(e) => updateChannel('email', e.target.checked)}
+                checked={formData.emailEnabled}
+                onChange={(e) => handleChange('emailEnabled', e.target.checked)}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
             </label>
@@ -156,8 +161,8 @@ export default function NotificationSettingsPage() {
               <input
                 type="checkbox"
                 className="sr-only peer"
-                checked={settings.channels.push}
-                onChange={(e) => updateChannel('push', e.target.checked)}
+                checked={formData.pushEnabled}
+                onChange={(e) => handleChange('pushEnabled', e.target.checked)}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
             </label>
@@ -177,8 +182,8 @@ export default function NotificationSettingsPage() {
               <input
                 type="checkbox"
                 className="sr-only peer"
-                checked={settings.channels.sms}
-                onChange={(e) => updateChannel('sms', e.target.checked)}
+                checked={formData.smsEnabled}
+                onChange={(e) => handleChange('smsEnabled', e.target.checked)}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
             </label>
@@ -241,51 +246,42 @@ export default function NotificationSettingsPage() {
             <input
               type="checkbox"
               className="sr-only peer"
-              checked={settings.quietHours.enabled}
-              onChange={(e) =>
-                setSettings((prev) => ({
-                  ...prev,
-                  quietHours: { ...prev.quietHours, enabled: e.target.checked },
-                }))
-              }
+              checked={formData.quietHoursEnabled}
+              onChange={(e) => handleChange('quietHoursEnabled', e.target.checked)}
             />
             <div className="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
           </label>
         </div>
 
-        {settings.quietHours.enabled && (
+        {formData.quietHoursEnabled && (
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Start Time
               </label>
-              <input
-                type="time"
-                value={settings.quietHours.start}
-                onChange={(e) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    quietHours: { ...prev.quietHours, start: e.target.value },
-                  }))
-                }
+              <select
+                value={formData.quietHoursStart}
+                onChange={(e) => handleChange('quietHoursStart', e.target.value)}
                 className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700"
-              />
+              >
+                {TIME_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 End Time
               </label>
-              <input
-                type="time"
-                value={settings.quietHours.end}
-                onChange={(e) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    quietHours: { ...prev.quietHours, end: e.target.value },
-                  }))
-                }
+              <select
+                value={formData.quietHoursEnd}
+                onChange={(e) => handleChange('quietHoursEnd', e.target.value)}
                 className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700"
-              />
+              >
+                {TIME_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             </div>
           </div>
         )}
@@ -340,9 +336,15 @@ export default function NotificationSettingsPage() {
       </Card>
 
       {/* Save Button */}
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving...' : 'Save Preferences'}
+      <div className="flex justify-end gap-4 items-center">
+        {hasChanges && (
+          <span className="text-sm text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
+            <ExclamationTriangleIcon className="w-4 h-4" />
+            Unsaved changes
+          </span>
+        )}
+        <Button onClick={handleSave} disabled={updateMutation.isPending || !hasChanges}>
+          {updateMutation.isPending ? 'Saving...' : 'Save Preferences'}
         </Button>
       </div>
     </div>

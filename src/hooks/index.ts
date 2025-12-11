@@ -239,3 +239,16 @@ export type {
   CreateNotificationConfigInput,
   UpdateNotificationConfigInput,
 } from './useThresholds';
+
+// User preferences hooks
+export {
+  useUserPreferences,
+  useUpdateUserPreferences,
+  formatTime24to12,
+  formatTime12to24,
+  TIME_OPTIONS,
+} from './useUserPreferences';
+export type {
+  UserNotificationPrefs,
+  UpdatePreferencesInput,
+} from './useUserPreferences';
