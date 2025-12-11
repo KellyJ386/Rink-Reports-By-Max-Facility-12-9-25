@@ -88,6 +88,7 @@ model User {
   auditLogs     AuditLog[]
   createdForms  FormTemplate[] @relation("FormCreator")
   notificationsSent NotificationLog[] @relation("NotificationSender")
+  scheduledReportsCreated ScheduledReport[] @relation("ScheduledReportCreator")
 
   @@index([email])
   @@index([role])
@@ -153,6 +154,7 @@ model Facility {
   alerts          Alert[]
   weatherCache    WeatherCache?
   notificationLogs NotificationLog[]
+  scheduledReports ScheduledReport[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -1460,4 +1462,83 @@ model DataRetentionPolicy {
   updatedAt         DateTime @updatedAt
 
   @@index([facilityId])
+}
+
+// ============================================
+// SCHEDULED REPORTS
+// ============================================
+
+enum ReportSchedule {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model ScheduledReport {
+  id              String         @id @default(cuid())
+  facilityId      String
+  createdById     String
+
+  // Report configuration
+  name            String
+  description     String?
+  reportType      String         // e.g., "ice_depth", "incidents", "air_quality", etc.
+
+  // Schedule
+  schedule        ReportSchedule
+  dayOfWeek       Int?           // 0-6 for weekly reports
+  dayOfMonth      Int?           // 1-31 for monthly reports
+  timeOfDay       String         @default("06:00") // When to generate/send
+
+  // Export settings
+  exportFormat    String         @default("csv") // "csv" or "json"
+  includeCharts   Boolean        @default(false)
+
+  // Email delivery
+  recipients      String[]       // Email addresses
+  emailSubject    String?
+  emailBody       String?
+
+  // Filters
+  dateRangeDays   Int            @default(7)  // Days of data to include
+
+  // Status
+  isActive        Boolean        @default(true)
+  lastRunAt       DateTime?
+  lastRunStatus   String?        // "success" or "failed"
+  lastRunError    String?
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  facility        Facility       @relation(fields: [facilityId], references: [id])
+  createdBy       User           @relation("ScheduledReportCreator", fields: [createdById], references: [id])
+  history         ReportHistory[]
+
+  @@index([facilityId])
+  @@index([isActive, schedule])
+  @@index([createdById])
+}
+
+model ReportHistory {
+  id                String          @id @default(cuid())
+  scheduledReportId String
+
+  generatedAt       DateTime        @default(now())
+  status            String          // "success", "failed"
+  errorMessage      String?
+
+  // Storage (URL or inline data reference)
+  fileUrl           String?
+  fileSize          Int?
+  recordCount       Int?
+
+  // Delivery
+  emailsSent        Int             @default(0)
+  emailsFailed      Int             @default(0)
+
+  scheduledReport   ScheduledReport @relation(fields: [scheduledReportId], references: [id], onDelete: Cascade)
+
+  @@index([scheduledReportId])
+  @@index([generatedAt])
 }

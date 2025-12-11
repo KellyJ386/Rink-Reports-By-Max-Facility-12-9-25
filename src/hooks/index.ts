@@ -297,3 +297,42 @@ export type {
   UpdateRecurringFormInput,
   RecurringFormFilters,
 } from './useRecurringForms';
+
+// Export hooks
+export {
+  useExport,
+  useExportDownload,
+  getDefaultDateRange,
+  getDateRangeForPeriod,
+  EXPORT_TYPE_LABELS,
+  EXPORT_FORMAT_LABELS,
+} from './useExport';
+export type {
+  ExportType,
+  ExportFormat,
+  ExportParams,
+  ExportResult,
+} from './useExport';
+
+// Scheduled reports hooks
+export {
+  useScheduledReports,
+  useScheduledReport,
+  useCreateScheduledReport,
+  useUpdateScheduledReport,
+  useDeleteScheduledReport,
+  useRunScheduledReport,
+  REPORT_TYPE_LABELS,
+  SCHEDULE_LABELS,
+  DAY_OF_WEEK_LABELS,
+  formatScheduleDescription as formatReportScheduleDescription,
+  getNextRunDate,
+} from './useScheduledReports';
+export type {
+  ScheduledReport as ScheduledExportReport,
+  ReportHistory,
+  ReportSchedule,
+  ReportType as ScheduledReportType,
+  CreateScheduledReportInput as CreateScheduledExportInput,
+  UpdateScheduledReportInput as UpdateScheduledExportInput,
+} from './useScheduledReports';
