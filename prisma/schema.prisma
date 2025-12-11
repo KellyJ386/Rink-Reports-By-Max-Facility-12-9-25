@@ -1542,3 +1542,82 @@ model ReportHistory {
   @@index([scheduledReportId])
   @@index([generatedAt])
 }
+
+// ============================================
+// ENTERPRISE / ORGANIZATION SETTINGS
+// ============================================
+
+model OrganizationSettings {
+  id              String   @id @default(cuid())
+  organizationId  String   @unique
+
+  // Branding
+  primaryColor    String?  @default("#0ea5e9")
+  secondaryColor  String?
+  logoUrl         String?
+  faviconUrl      String?
+
+  // Default thresholds for new facilities
+  defaultIceDepthMin    Float?   @default(0.75)
+  defaultIceDepthMax    Float?   @default(1.25)
+  defaultCO2Threshold   Int?     @default(1000)
+  defaultCOThreshold    Float?   @default(25)
+
+  // Feature toggles
+  enableScheduling      Boolean  @default(true)
+  enableIncidents       Boolean  @default(true)
+  enableForms           Boolean  @default(true)
+  enableReports         Boolean  @default(true)
+  enableAirQuality      Boolean  @default(true)
+  enableRefrigeration   Boolean  @default(true)
+
+  // Security settings
+  requireMFA            Boolean  @default(false)
+  sessionTimeoutMinutes Int      @default(480)  // 8 hours
+  passwordMinLength     Int      @default(8)
+  passwordRequireSpecial Boolean @default(false)
+
+  // Data retention
+  auditLogRetentionDays  Int     @default(365)
+  incidentRetentionYears Int     @default(5)
+  readingsRetentionDays  Int     @default(365)
+
+  // Notification defaults
+  defaultEmailNotifications Boolean @default(true)
+  defaultSMSNotifications   Boolean @default(false)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+// Facility groups for organizing facilities
+model FacilityGroup {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  description     String?
+  color           String?  // For UI display
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  facilities      FacilityGroupMember[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model FacilityGroupMember {
+  id              String   @id @default(cuid())
+  facilityGroupId String
+  facilityId      String
+
+  createdAt       DateTime @default(now())
+
+  facilityGroup   FacilityGroup @relation(fields: [facilityGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([facilityGroupId, facilityId])
+  @@index([facilityId])
+}

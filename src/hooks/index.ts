@@ -336,3 +336,46 @@ export type {
   CreateScheduledReportInput as CreateScheduledExportInput,
   UpdateScheduledReportInput as UpdateScheduledExportInput,
 } from './useScheduledReports';
+
+// Organization dashboard hooks
+export {
+  useOrganizationDashboard,
+  useOrganizationDashboardLive,
+  useFacilityComparison,
+  getSummaryCardColor,
+  calculatePercentageChange,
+  formatLargeNumber,
+  getFacilityHealthScore,
+  getHealthStatusColor,
+  COMPARISON_METRIC_LABELS,
+  COMPARISON_PERIOD_LABELS,
+} from './useOrganization';
+export type {
+  FacilityStat,
+  OrganizationDashboard,
+  ComparisonMetric,
+  ComparisonPeriod,
+  ComparisonResult,
+  ComparisonParams,
+} from './useOrganization';
+
+// Enterprise settings hooks
+export {
+  useOrganizationSettings,
+  useUpdateOrganizationSettings,
+  useFacilityGroups,
+  useCreateFacilityGroup,
+  useUpdateFacilityGroup,
+  useDeleteFacilityGroup,
+  FEATURE_LABELS,
+  SECURITY_LABELS,
+} from './useEnterpriseSettings';
+export type {
+  OrganizationSettings,
+  Organization,
+  OrganizationSettingsResponse,
+  UpdateSettingsInput,
+  FacilityGroup,
+  CreateGroupInput,
+  UpdateGroupInput,
+} from './useEnterpriseSettings';
