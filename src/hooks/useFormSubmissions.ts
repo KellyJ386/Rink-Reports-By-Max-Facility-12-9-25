@@ -257,6 +257,142 @@ export function useCreateForm() {
   });
 }
 
+// Update form
+async function updateForm(formId: string, data: {
+  name?: string;
+  description?: string;
+  category?: string;
+  isPublished?: boolean;
+  fields?: Array<{
+    id: string;
+    fieldType: string;
+    label: string;
+    placeholder?: string;
+    helpText?: string;
+    isRequired: boolean;
+    minValue?: number;
+    maxValue?: number;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+    options?: Array<{ value: string; label: string }>;
+    orderIndex: number;
+    sectionId?: string;
+    width?: 'full' | 'half' | 'third';
+    conditionalLogic?: {
+      showIf: {
+        fieldId: string;
+        operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than';
+        value: string | number | boolean;
+      };
+    };
+    defaultValue?: string;
+  }>;
+  includeWeather?: boolean;
+  includeTimestamp?: boolean;
+  includeUser?: boolean;
+  includeFacility?: boolean;
+}): Promise<FormTemplate> {
+  const response = await fetch(`/api/forms/${formId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update form');
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+// Hook to update a form
+export function useUpdateForm(formId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: Parameters<typeof updateForm>[1]) => updateForm(formId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
+      queryClient.invalidateQueries({ queryKey: ['forms', formId] });
+    },
+  });
+}
+
+// Clone form
+async function cloneForm(formId: string, newName?: string): Promise<FormTemplate> {
+  const response = await fetch(`/api/forms/${formId}/clone`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: newName }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to clone form');
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+// Hook to clone a form
+export function useCloneForm() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ formId, newName }: { formId: string; newName?: string }) => cloneForm(formId, newName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
+    },
+  });
+}
+
+// Delete form
+async function deleteForm(formId: string): Promise<void> {
+  const response = await fetch(`/api/forms/${formId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete form');
+  }
+}
+
+// Hook to delete a form
+export function useDeleteForm() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteForm,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
+    },
+  });
+}
+
+// Publish/unpublish form
+async function toggleFormPublish(formId: string, isPublished: boolean): Promise<FormTemplate> {
+  return updateForm(formId, { isPublished });
+}
+
+// Hook to publish/unpublish a form
+export function useToggleFormPublish() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ formId, isPublished }: { formId: string; isPublished: boolean }) =>
+      toggleFormPublish(formId, isPublished),
+    onSuccess: (_, { formId }) => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
+      queryClient.invalidateQueries({ queryKey: ['forms', formId] });
+    },
+  });
+}
+
 // Hook to fetch all forms
 export function useForms(params?: {
   facilityId?: string;

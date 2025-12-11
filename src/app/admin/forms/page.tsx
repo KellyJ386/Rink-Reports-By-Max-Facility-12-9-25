@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, Fragment } from 'react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
+import { Dialog, Transition } from '@headlessui/react';
 import {
   PlusIcon,
   DocumentTextIcon,
@@ -11,11 +12,18 @@ import {
   DocumentDuplicateIcon,
   EyeIcon,
   ArrowPathIcon,
+  TrashIcon,
+  XMarkIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
-import { useForms } from '@/hooks';
+import { Input } from '@/components/ui/Input';
+import { useForms, useCloneForm, useDeleteForm, useToggleFormPublish } from '@/hooks';
+import { FormPreview } from '@/components/form-builder/FormPreview';
 
 const CATEGORY_LABELS: Record<string, string> = {
   ICE_OPERATIONS: 'Ice Operations',
@@ -44,8 +52,21 @@ const REFRESH_OPTIONS = [
 
 export default function FormsPage() {
   const [refreshInterval, setRefreshInterval] = useState(60000);
+  const [previewFormId, setPreviewFormId] = useState<string | null>(null);
+  const [cloneFormId, setCloneFormId] = useState<string | null>(null);
+  const [cloneName, setCloneName] = useState('');
+  const [deleteFormId, setDeleteFormId] = useState<string | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   const { data: forms = [], isLoading, error, refetch, dataUpdatedAt } = useForms();
+  const cloneFormMutation = useCloneForm();
+  const deleteFormMutation = useDeleteForm();
+  const togglePublishMutation = useToggleFormPublish();
+
+  // Get form for preview
+  const previewForm = forms.find(f => f.id === previewFormId);
+  const deleteForm = forms.find(f => f.id === deleteFormId);
+  const cloneForm = forms.find(f => f.id === cloneFormId);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -58,6 +79,42 @@ export default function FormsPage() {
   const formatLastUpdated = () => {
     if (!dataUpdatedAt) return 'Never';
     return formatDistanceToNow(dataUpdatedAt, { addSuffix: true });
+  };
+
+  const handleClone = async () => {
+    if (!cloneFormId) return;
+    try {
+      await cloneFormMutation.mutateAsync({
+        formId: cloneFormId,
+        newName: cloneName || undefined,
+      });
+      setCloneFormId(null);
+      setCloneName('');
+    } catch (err) {
+      console.error('Failed to clone form:', err);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteFormId) return;
+    try {
+      await deleteFormMutation.mutateAsync(deleteFormId);
+      setDeleteFormId(null);
+    } catch (err) {
+      console.error('Failed to delete form:', err);
+    }
+  };
+
+  const handleTogglePublish = async (formId: string, currentlyPublished: boolean) => {
+    try {
+      await togglePublishMutation.mutateAsync({
+        formId,
+        isPublished: !currentlyPublished,
+      });
+      setActiveDropdown(null);
+    } catch (err) {
+      console.error('Failed to toggle publish:', err);
+    }
   };
 
   if (isLoading) {
@@ -187,10 +244,75 @@ export default function FormsPage() {
                     </span>
                   </div>
                 </div>
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1 text-rink-400 hover:text-rink-600 rounded">
+                <div className="relative">
+                  <button
+                    onClick={() => setActiveDropdown(activeDropdown === form.id ? null : form.id)}
+                    className="p-1 text-rink-400 hover:text-rink-600 rounded"
+                  >
                     <EllipsisVerticalIcon className="w-5 h-5" />
                   </button>
+                  {activeDropdown === form.id && (
+                    <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10">
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            setPreviewFormId(form.id);
+                            setActiveDropdown(null);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                        >
+                          <EyeIcon className="w-4 h-4" />
+                          Preview
+                        </button>
+                        <Link
+                          href={`/admin/forms/${form.id}/edit`}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                          onClick={() => setActiveDropdown(null)}
+                        >
+                          <PencilIcon className="w-4 h-4" />
+                          Edit
+                        </Link>
+                        <button
+                          onClick={() => {
+                            setCloneFormId(form.id);
+                            setCloneName(`${form.name} (Copy)`);
+                            setActiveDropdown(null);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                        >
+                          <DocumentDuplicateIcon className="w-4 h-4" />
+                          Clone
+                        </button>
+                        <button
+                          onClick={() => handleTogglePublish(form.id, form.isPublished)}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                        >
+                          {form.isPublished ? (
+                            <>
+                              <XMarkIcon className="w-4 h-4" />
+                              Unpublish
+                            </>
+                          ) : (
+                            <>
+                              <GlobeAltIcon className="w-4 h-4" />
+                              Publish
+                            </>
+                          )}
+                        </button>
+                        <hr className="my-1 border-gray-200 dark:border-gray-700" />
+                        <button
+                          onClick={() => {
+                            setDeleteFormId(form.id);
+                            setActiveDropdown(null);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -225,10 +347,23 @@ export default function FormsPage() {
                   Edit
                 </Button>
               </Link>
-              <Button variant="ghost" size="sm" leftIcon={<EyeIcon className="w-4 h-4" />}>
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<EyeIcon className="w-4 h-4" />}
+                onClick={() => setPreviewFormId(form.id)}
+              >
                 Preview
               </Button>
-              <Button variant="ghost" size="sm" leftIcon={<DocumentDuplicateIcon className="w-4 h-4" />}>
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<DocumentDuplicateIcon className="w-4 h-4" />}
+                onClick={() => {
+                  setCloneFormId(form.id);
+                  setCloneName(`${form.name} (Copy)`);
+                }}
+              >
                 Clone
               </Button>
             </div>
@@ -258,6 +393,194 @@ export default function FormsPage() {
             <Button leftIcon={<PlusIcon className="w-4 h-4" />}>Create Form</Button>
           </Link>
         </div>
+      )}
+
+      {/* Preview Modal */}
+      <Transition appear show={!!previewFormId} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => setPreviewFormId(null)}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-25" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
+                  <div className="flex items-center justify-between mb-4">
+                    <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Form Preview: {previewForm?.name}
+                    </Dialog.Title>
+                    <button
+                      onClick={() => setPreviewFormId(null)}
+                      className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    >
+                      <XMarkIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+                  {previewForm && (
+                    <FormPreview form={previewForm} />
+                  )}
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* Clone Modal */}
+      <Transition appear show={!!cloneFormId} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => setCloneFormId(null)}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-25" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-ice-100 rounded-lg">
+                      <DocumentDuplicateIcon className="w-6 h-6 text-ice-600" />
+                    </div>
+                    <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Clone Form
+                    </Dialog.Title>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Create a copy of &quot;{cloneForm?.name}&quot; with all its fields.
+                  </p>
+                  <Input
+                    label="New Form Name"
+                    value={cloneName}
+                    onChange={(e) => setCloneName(e.target.value)}
+                    placeholder="Enter name for the cloned form"
+                  />
+                  <div className="mt-6 flex justify-end gap-3">
+                    <Button variant="secondary" onClick={() => setCloneFormId(null)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleClone}
+                      isLoading={cloneFormMutation.isPending}
+                      leftIcon={<DocumentDuplicateIcon className="w-4 h-4" />}
+                    >
+                      Clone Form
+                    </Button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* Delete Confirmation Modal */}
+      <Transition appear show={!!deleteFormId} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => setDeleteFormId(null)}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-25" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-red-100 rounded-lg">
+                      <ExclamationTriangleIcon className="w-6 h-6 text-red-600" />
+                    </div>
+                    <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Delete Form
+                    </Dialog.Title>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    Are you sure you want to delete &quot;{deleteForm?.name}&quot;?
+                  </p>
+                  {deleteForm?._count?.submissions ? (
+                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg mb-4">
+                      <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                        This form has {deleteForm._count.submissions} submission(s). It will be archived instead of permanently deleted.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-red-600 dark:text-red-400 mb-4">
+                      This action cannot be undone.
+                    </p>
+                  )}
+                  <div className="mt-6 flex justify-end gap-3">
+                    <Button variant="secondary" onClick={() => setDeleteFormId(null)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onClick={handleDelete}
+                      isLoading={deleteFormMutation.isPending}
+                      leftIcon={<TrashIcon className="w-4 h-4" />}
+                    >
+                      {deleteForm?._count?.submissions ? 'Archive Form' : 'Delete Form'}
+                    </Button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* Click outside to close dropdown */}
+      {activeDropdown && (
+        <div
+          className="fixed inset-0 z-0"
+          onClick={() => setActiveDropdown(null)}
+        />
       )}
     </div>
   );
