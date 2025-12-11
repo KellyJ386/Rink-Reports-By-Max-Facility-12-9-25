@@ -276,3 +276,24 @@ export type {
   ReviewSwapInput,
   SwapFilters,
 } from './useShiftSwaps';
+
+// Recurring forms hooks
+export {
+  useRecurringForms,
+  useRecurringForm,
+  useCreateRecurringForm,
+  useUpdateRecurringForm,
+  useDeleteRecurringForm,
+  FREQUENCY_LABELS,
+  DAY_LABELS,
+  DAY_FULL_LABELS,
+  formatScheduleDescription,
+  getNextOccurrence,
+} from './useRecurringForms';
+export type {
+  RecurringForm,
+  RecurringFrequency,
+  CreateRecurringFormInput,
+  UpdateRecurringFormInput,
+  RecurringFormFilters,
+} from './useRecurringForms';
