@@ -3,9 +3,10 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { checkAirQualityThresholds, getThresholds } from '@/lib/thresholdChecker';
 
-// Configurable thresholds (could be stored in DB per facility)
-const THRESHOLDS = {
+// Legacy thresholds for fallback (now uses configurable thresholds from DB)
+const LEGACY_THRESHOLDS = {
   CO2_WARNING: 800,
   CO2_DANGER: 1000,
   CO_WARNING: 9,
@@ -99,9 +100,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = airQualityLogSchema.parse(body);
 
-    // Check thresholds
+    // Check thresholds using legacy logic for backwards compatibility
     const thresholdExceeded = checkThresholds(validatedData);
-    const alerts = generateAlerts(validatedData);
+    const legacyAlerts = generateAlerts(validatedData);
 
     // Create the log
     const log = await prisma.airQualityLog.create({
@@ -114,34 +115,41 @@ export async function POST(request: NextRequest) {
         humidity: validatedData.humidity,
         coLevel: validatedData.coLevel,
         thresholdExceeded,
-        alertSent: alerts.length > 0,
+        alertSent: legacyAlerts.length > 0,
         notes: validatedData.notes,
       },
     });
 
-    // Create alerts if thresholds exceeded
-    for (const alert of alerts) {
-      await prisma.alert.create({
-        data: {
-          facilityId: validatedData.facilityId,
-          alertType: alert.type,
-          severity: alert.severity,
-          message: alert.message,
-          threshold: alert.threshold,
-          actualValue: alert.actualValue,
-        },
+    // Use new configurable threshold checker (this creates alerts and queues notifications)
+    const thresholdResults = await checkAirQualityThresholds(
+      validatedData.facilityId,
+      {
+        co2Level: validatedData.co2Level ?? null,
+        coLevel: validatedData.coLevel ?? null,
+        temperature: validatedData.temperature ?? null,
+        humidity: validatedData.humidity ?? null,
+      },
+      log.id,
+      session.user.id
+    );
+
+    // If thresholds are exceeded, update the log
+    if (thresholdResults.length > 0) {
+      await prisma.airQualityLog.update({
+        where: { id: log.id },
+        data: { thresholdExceeded: true, alertSent: true },
       });
     }
 
-    // If CO2 or CO is at danger levels, send notification to managers
-    if (alerts.some((a) => a.severity === 'SERIOUS' || a.severity === 'CRITICAL')) {
-      await createNotificationsForManagers(validatedData.facilityId, alerts);
+    // Also send legacy notifications for critical alerts
+    if (legacyAlerts.some((a) => a.severity === 'SERIOUS' || a.severity === 'CRITICAL')) {
+      await createNotificationsForManagers(validatedData.facilityId, legacyAlerts);
     }
 
     return NextResponse.json({
       success: true,
       data: log,
-      alerts: alerts.length > 0 ? alerts : undefined,
+      alerts: legacyAlerts.length > 0 ? legacyAlerts : undefined,
     }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

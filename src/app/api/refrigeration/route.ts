@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { checkRefrigerationThresholds } from '@/lib/thresholdChecker';
 
 // Schema for refrigeration log
 const refrigerationLogSchema = z.object({
@@ -112,7 +113,25 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Check for critical conditions and create alerts
+    // Check against configured thresholds and create alerts if needed
+    await checkRefrigerationThresholds(
+      validatedData.facilityId,
+      {
+        brineSupply: validatedData.brineSupply ?? null,
+        brineReturn: validatedData.brineReturn ?? null,
+        compressor1Suction: validatedData.compressor1Suction ?? null,
+        compressor1Discharge: validatedData.compressor1Discharge ?? null,
+        compressor2Suction: validatedData.compressor2Suction ?? null,
+        compressor2Discharge: validatedData.compressor2Discharge ?? null,
+        condenserIn: validatedData.condenserIn ?? null,
+        condenserOut: validatedData.condenserOut ?? null,
+        oilPressure: validatedData.oilPressure ?? null,
+      },
+      log.id,
+      session.user.id
+    );
+
+    // Also check for critical status conditions
     if (
       validatedData.oilLevel === 'CRITICAL' ||
       validatedData.refrigerantLevel === 'CRITICAL' ||
@@ -121,7 +140,7 @@ export async function POST(request: NextRequest) {
       await prisma.alert.create({
         data: {
           facilityId: validatedData.facilityId,
-          alertType: 'REFRIGERATION_CRITICAL',
+          alertType: 'REFRIGERATION_STATUS',
           severity: 'SERIOUS',
           message: `Critical refrigeration condition detected: ${
             validatedData.oilLevel === 'CRITICAL' ? 'Oil level critical. ' : ''

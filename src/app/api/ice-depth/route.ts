@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { checkIceDepthThresholds } from '@/lib/thresholdChecker';
 
 // Schema for ice depth reading
 const iceDepthReadingSchema = z.object({
@@ -143,24 +144,31 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Check for thin ice alerts (< 0.75 inches)
-    if (stats.minDepth !== null && stats.minDepth < 0.75) {
-      const rink = await prisma.rink.findUnique({
-        where: { id: validatedData.rinkId },
-        include: { facility: true },
-      });
+    // Check against configured thresholds and create alerts if needed
+    const rink = await prisma.rink.findUnique({
+      where: { id: validatedData.rinkId },
+      include: { facility: true },
+    });
 
-      if (rink) {
-        await prisma.alert.create({
-          data: {
-            facilityId: rink.facilityId,
-            alertType: 'ICE_THIN',
-            severity: stats.minDepth < 0.5 ? 'CRITICAL' : 'SERIOUS',
-            message: `Thin ice detected on ${rink.name}. Minimum depth: ${stats.minDepth}" at point(s) below safe threshold.`,
-            threshold: 0.75,
-            actualValue: stats.minDepth,
-          },
+    if (rink) {
+      const thresholdResults = await checkIceDepthThresholds(
+        rink.facilityId,
+        rink.id,
+        rink.name,
+        stats.minDepth,
+        stats.maxDepth,
+        stats.averageDepth,
+        reading.id,
+        session.user.id
+      );
+
+      // If thresholds were exceeded, update reading status to FLAGGED
+      if (thresholdResults.some((r) => r.status === 'critical')) {
+        await prisma.iceDepthReading.update({
+          where: { id: reading.id },
+          data: { status: 'FLAGGED' },
         });
+        reading.status = 'FLAGGED';
       }
     }
 
