@@ -207,16 +207,56 @@ export async function POST(
       );
     }
 
-    // Create the submission
+    // Build field responses from submitted data
+    const fieldResponses = form.fields
+      .filter(field => validatedData.data[field.id] !== undefined)
+      .map(field => {
+        const value = validatedData.data[field.id];
+
+        // Determine value storage based on field type
+        let stringValue: string | null = null;
+        let numericValue: number | null = null;
+        let booleanValue: boolean | null = null;
+        let jsonValue: unknown = null;
+
+        if (value === null || value === undefined) {
+          // Keep all as null
+        } else if (typeof value === 'boolean') {
+          booleanValue = value;
+          stringValue = String(value);
+        } else if (typeof value === 'number') {
+          numericValue = value;
+          stringValue = String(value);
+        } else if (Array.isArray(value) || typeof value === 'object') {
+          jsonValue = value;
+          stringValue = JSON.stringify(value);
+        } else {
+          stringValue = String(value);
+        }
+
+        return {
+          formFieldId: field.id,
+          value: stringValue,
+          numericValue,
+          booleanValue,
+          jsonValue,
+        };
+      });
+
+    // Create the submission with field responses
     const submission = await prisma.formSubmission.create({
       data: {
         formTemplateId: formId,
         submittedById: session.user.id,
         facilityId: facilityUser.facilityId,
-        formVersion: form.version,
-        data: validatedData.data,
-        weatherData: validatedData.weatherData,
-        location: validatedData.location,
+        weatherData: validatedData.weatherData || undefined,
+        deviceInfo: {
+          userAgent: request.headers.get('user-agent') || 'unknown',
+          platform: 'web',
+        },
+        fieldResponses: {
+          create: fieldResponses,
+        },
       },
       include: {
         submittedBy: {
@@ -227,6 +267,13 @@ export async function POST(
         },
         formTemplate: {
           select: { id: true, name: true, category: true },
+        },
+        fieldResponses: {
+          include: {
+            formField: {
+              select: { id: true, label: true, fieldType: true },
+            },
+          },
         },
       },
     });

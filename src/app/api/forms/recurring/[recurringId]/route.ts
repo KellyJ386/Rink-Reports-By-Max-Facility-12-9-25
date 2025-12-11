@@ -44,7 +44,7 @@ export async function GET(
             category: true,
             isActive: true,
             fields: {
-              orderBy: { order: 'asc' },
+              orderBy: { orderIndex: 'asc' },
             },
             facility: {
               select: { id: true, name: true },
