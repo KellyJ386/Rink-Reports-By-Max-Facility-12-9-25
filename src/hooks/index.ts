@@ -379,3 +379,16 @@ export type {
   CreateGroupInput,
   UpdateGroupInput,
 } from './useEnterpriseSettings';
+
+// Offline and PWA hooks
+export {
+  useOfflineStatus,
+  useServiceWorker,
+  useLocalData,
+  usePushNotifications,
+  useNetworkAwareRequest,
+} from './useOffline';
+export type {
+  OfflineStatus,
+  SyncResult,
+} from './useOffline';

@@ -2,11 +2,12 @@
   "name": "Max Facility Operations",
   "short_name": "MFO",
   "description": "Ice Rink Management SaaS Platform",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#f8fafc",
+  "background_color": "#0f172a",
   "theme_color": "#0ea5e9",
-  "orientation": "portrait-primary",
+  "orientation": "any",
+  "scope": "/",
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
@@ -58,6 +59,32 @@
     }
   ],
   "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Ice Depth",
+      "short_name": "Ice",
+      "description": "Record ice depth measurements",
+      "url": "/dashboard/ice-depth"
+    },
+    {
+      "name": "Schedule",
+      "short_name": "Schedule",
+      "description": "View staff schedule",
+      "url": "/dashboard/schedule"
+    },
+    {
+      "name": "Forms",
+      "short_name": "Forms",
+      "description": "Submit daily forms",
+      "url": "/dashboard/forms"
+    },
+    {
+      "name": "Incidents",
+      "short_name": "Incidents",
+      "description": "Report incidents",
+      "url": "/dashboard/incidents"
+    }
+  ],
   "screenshots": [
     {
       "src": "/screenshots/dashboard.png",
