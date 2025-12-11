@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { DraggableScheduleCalendar, ShiftModal, Shift } from '@/components/scheduling';
+import { DraggableScheduleCalendar, ShiftModal, Shift, ShiftSwapsList, ShiftSwapModal } from '@/components/scheduling';
 import {
   useShifts,
   useMoveShift,
@@ -13,7 +14,9 @@ import {
   useTimeOffRequests,
   useReviewTimeOff,
   useUsers,
+  usePendingSwapApprovals,
 } from '@/hooks';
+import { hasPermission } from '@/types';
 import {
   CalendarDaysIcon,
   ClockIcon,
@@ -22,8 +25,10 @@ import {
   ArrowPathIcon,
   CheckIcon,
   XMarkIcon,
+  ArrowsRightLeftIcon,
 } from '@heroicons/react/24/outline';
 import { format, startOfWeek, endOfWeek, formatDistanceToNow } from 'date-fns';
+import { useSession } from 'next-auth/react';
 
 const REFRESH_OPTIONS = [
   { label: 'Off', value: 0 },
@@ -33,10 +38,32 @@ const REFRESH_OPTIONS = [
 ];
 
 export default function SchedulePage() {
+  const searchParams = useSearchParams();
+  const { data: session } = useSession();
+
+  const [activeTab, setActiveTab] = useState<'schedule' | 'swaps'>('schedule');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
+  const [swapShift, setSwapShift] = useState<Shift | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [refreshInterval, setRefreshInterval] = useState(60000);
+
+  const currentUserId = session?.user?.id;
+  const userRole = session?.user?.role || 'STAFF';
+  const isManager = hasPermission(userRole, 'schedule:manage');
+
+  // Handle URL params for tab switching (e.g., from notifications)
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'swaps') {
+      setActiveTab('swaps');
+    }
+  }, [searchParams]);
+
+  // Fetch pending swaps count for badge
+  const { data: pendingSwaps } = usePendingSwapApprovals();
+  const pendingSwapsCount = pendingSwaps?.total || 0;
 
   // Fetch real data from API
   const {
@@ -121,6 +148,19 @@ export default function SchedulePage() {
     setSelectedShift(shift);
     setIsModalOpen(true);
   };
+
+  const handleRequestSwap = (shift: Shift) => {
+    // Only allow swapping own shifts
+    if (shift.userId === currentUserId) {
+      setSwapShift(shift);
+      setIsSwapModalOpen(true);
+    }
+  };
+
+  // Get user's own shifts for swap modal
+  const myShifts = useMemo(() => {
+    return shifts.filter((s) => s.userId === currentUserId);
+  }, [shifts, currentUserId]);
 
   const handleMoveShift = async (shiftId: string, newDate: string) => {
     try {
@@ -258,153 +298,203 @@ export default function SchedulePage() {
           >
             <ArrowPathIcon className="w-5 h-5" />
           </button>
-          <Button leftIcon={<PlusIcon className="w-4 h-4" />} onClick={() => handleAddShift(new Date())}>
-            Add Shift
-          </Button>
+          {isManager && (
+            <Button leftIcon={<PlusIcon className="w-4 h-4" />} onClick={() => handleAddShift(new Date())}>
+              Add Shift
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {stats.map((stat) => (
-          <Card key={stat.name} className="flex items-center gap-4">
-            <div className="p-3 bg-ice-100 rounded-lg">
-              <stat.icon className="w-6 h-6 text-ice-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-rink-900">{stat.value}</p>
-              <p className="text-sm text-rink-500">{stat.name}</p>
-            </div>
+      {/* Tabs */}
+      <div className="border-b dark:border-gray-700">
+        <nav className="flex gap-4" aria-label="Tabs">
+          <button
+            onClick={() => setActiveTab('schedule')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'schedule'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            <CalendarDaysIcon className="w-5 h-5" />
+            Schedule
+          </button>
+          <button
+            onClick={() => setActiveTab('swaps')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors relative ${
+              activeTab === 'swaps'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            <ArrowsRightLeftIcon className="w-5 h-5" />
+            Shift Swaps
+            {pendingSwapsCount > 0 && isManager && (
+              <span className="absolute -top-1 -right-1 bg-yellow-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {pendingSwapsCount}
+              </span>
+            )}
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'schedule' ? (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {stats.map((stat) => (
+              <Card key={stat.name} className="flex items-center gap-4">
+                <div className="p-3 bg-ice-100 rounded-lg">
+                  <stat.icon className="w-6 h-6 text-ice-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-rink-900">{stat.value}</p>
+                  <p className="text-sm text-rink-500">{stat.name}</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Drag-and-Drop Calendar */}
+          <Card>
+            <DraggableScheduleCalendar
+              shifts={shifts}
+              onAddShift={handleAddShift}
+              onEditShift={handleEditShift}
+              onMoveShift={handleMoveShift}
+              onRequestSwap={handleRequestSwap}
+              isEditable={isManager}
+              currentUserId={currentUserId}
+            />
           </Card>
-        ))}
-      </div>
 
-      {/* Drag-and-Drop Calendar */}
-      <Card>
-        <DraggableScheduleCalendar
-          shifts={shifts}
-          onAddShift={handleAddShift}
-          onEditShift={handleEditShift}
-          onMoveShift={handleMoveShift}
-          isEditable={true}
-        />
-      </Card>
-
-      {/* Upcoming Shifts Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <h3 className="text-lg font-semibold text-rink-900 mb-4">Today's Shifts</h3>
-          <div className="space-y-3">
-            {todayShifts.length > 0 ? (
-              todayShifts.map((shift) => (
-                <div
-                  key={shift.id}
-                  className="flex items-center justify-between p-3 bg-rink-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-ice-100 rounded-full flex items-center justify-center">
-                      <span className="text-ice-700 font-medium">
-                        {(shift.userName || shift.user?.name || 'U')
-                          .split(' ')
-                          .map((n) => n[0])
-                          .join('')}
-                      </span>
+          {/* Upcoming Shifts Summary */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <h3 className="text-lg font-semibold text-rink-900 mb-4">Today's Shifts</h3>
+              <div className="space-y-3">
+                {todayShifts.length > 0 ? (
+                  todayShifts.map((shift) => (
+                    <div
+                      key={shift.id}
+                      className="flex items-center justify-between p-3 bg-rink-50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-ice-100 rounded-full flex items-center justify-center">
+                          <span className="text-ice-700 font-medium">
+                            {(shift.userName || shift.user?.name || 'U')
+                              .split(' ')
+                              .map((n) => n[0])
+                              .join('')}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium text-rink-900">
+                            {shift.userName || shift.user?.name || 'Unknown'}
+                          </p>
+                          <p className="text-sm text-rink-500">
+                            {shift.position || 'General Staff'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-rink-700">
+                          {new Date(shift.startTime).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}{' '}
+                          -{' '}
+                          {new Date(shift.endTime).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                        <Badge
+                          variant={
+                            shift.status === 'CONFIRMED'
+                              ? 'success'
+                              : shift.status === 'IN_PROGRESS'
+                              ? 'warning'
+                              : shift.status === 'COMPLETED'
+                              ? 'info'
+                              : 'default'
+                          }
+                        >
+                          {shift.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-rink-900">
-                        {shift.userName || shift.user?.name || 'Unknown'}
-                      </p>
-                      <p className="text-sm text-rink-500">
-                        {shift.position || 'General Staff'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-rink-700">
-                      {new Date(shift.startTime).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}{' '}
-                      -{' '}
-                      {new Date(shift.endTime).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                    <Badge
-                      variant={
-                        shift.status === 'CONFIRMED'
-                          ? 'success'
-                          : shift.status === 'IN_PROGRESS'
-                          ? 'warning'
-                          : shift.status === 'COMPLETED'
-                          ? 'info'
-                          : 'default'
-                      }
-                    >
-                      {shift.status.replace('_', ' ')}
-                    </Badge>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-center text-rink-500 py-4">
-                No shifts scheduled for today
-              </p>
-            )}
-          </div>
-        </Card>
+                  ))
+                ) : (
+                  <p className="text-center text-rink-500 py-4">
+                    No shifts scheduled for today
+                  </p>
+                )}
+              </div>
+            </Card>
 
-        <Card>
-          <h3 className="text-lg font-semibold text-rink-900 mb-4">
-            Pending Time-Off Requests
-          </h3>
-          <div className="space-y-3">
-            {timeOffRequests.length > 0 ? (
-              timeOffRequests.map((request) => (
-                <div
-                  key={request.id}
-                  className="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium text-rink-900">
-                      {request.user?.name || 'Unknown User'}
-                    </p>
-                    <p className="text-sm text-rink-500">
-                      {format(new Date(request.startDate), 'MMM d')} -{' '}
-                      {format(new Date(request.endDate), 'MMM d, yyyy')}
-                    </p>
-                    <p className="text-xs text-rink-400 mt-1">
-                      {request.reason || request.type}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleDenyTimeOff(request.id)}
-                      disabled={reviewTimeOffMutation.isPending}
+            <Card>
+              <h3 className="text-lg font-semibold text-rink-900 mb-4">
+                Pending Time-Off Requests
+              </h3>
+              <div className="space-y-3">
+                {timeOffRequests.length > 0 ? (
+                  timeOffRequests.map((request) => (
+                    <div
+                      key={request.id}
+                      className="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
                     >
-                      <XMarkIcon className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleApproveTimeOff(request.id)}
-                      disabled={reviewTimeOffMutation.isPending}
-                    >
-                      <CheckIcon className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-center text-rink-500 py-4">
-                No pending time-off requests
-              </p>
-            )}
+                      <div>
+                        <p className="font-medium text-rink-900">
+                          {request.user?.name || 'Unknown User'}
+                        </p>
+                        <p className="text-sm text-rink-500">
+                          {format(new Date(request.startDate), 'MMM d')} -{' '}
+                          {format(new Date(request.endDate), 'MMM d, yyyy')}
+                        </p>
+                        <p className="text-xs text-rink-400 mt-1">
+                          {request.reason || request.type}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleDenyTimeOff(request.id)}
+                          disabled={reviewTimeOffMutation.isPending}
+                        >
+                          <XMarkIcon className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleApproveTimeOff(request.id)}
+                          disabled={reviewTimeOffMutation.isPending}
+                        >
+                          <CheckIcon className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-rink-500 py-4">
+                    No pending time-off requests
+                  </p>
+                )}
+              </div>
+            </Card>
           </div>
+        </>
+      ) : (
+        /* Shift Swaps Tab */
+        <Card>
+          <ShiftSwapsList
+            currentUserId={currentUserId}
+            userRole={userRole}
+          />
         </Card>
-      </div>
+      )}
 
       {/* Shift Modal */}
       <ShiftModal
@@ -415,6 +505,21 @@ export default function SchedulePage() {
         employees={employees}
         onSave={handleSaveShift}
       />
+
+      {/* Shift Swap Modal */}
+      {swapShift && (
+        <ShiftSwapModal
+          isOpen={isSwapModalOpen}
+          onClose={() => {
+            setIsSwapModalOpen(false);
+            setSwapShift(null);
+          }}
+          shift={swapShift}
+          availableShifts={shifts}
+          currentUserId={currentUserId || ''}
+          onSuccess={() => refetchShifts()}
+        />
+      )}
     </div>
   );
 }

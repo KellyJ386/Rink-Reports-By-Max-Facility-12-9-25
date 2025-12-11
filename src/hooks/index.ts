@@ -252,3 +252,27 @@ export type {
   UserNotificationPrefs,
   UpdatePreferencesInput,
 } from './useUserPreferences';
+
+// Shift swap hooks
+export {
+  useShiftSwaps,
+  useShiftSwap,
+  useMySwapRequests,
+  usePendingSwapApprovals,
+  useCreateSwapRequest,
+  useReviewSwapRequest,
+  useCancelSwapRequest,
+  SWAP_STATUS_LABELS,
+  SWAP_STATUS_COLORS,
+  formatSwapShiftDate,
+  formatSwapShiftTime,
+  getSwapStatusBadgeClass,
+} from './useShiftSwaps';
+export type {
+  ShiftSwapRequest,
+  EnrichedSwapRequest,
+  SwapStatus,
+  CreateSwapInput,
+  ReviewSwapInput,
+  SwapFilters,
+} from './useShiftSwaps';

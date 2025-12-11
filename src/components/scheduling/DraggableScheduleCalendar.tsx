@@ -47,12 +47,13 @@ import clsx from 'clsx';
 export interface Shift {
   id: string;
   userId: string;
-  userName: string;
+  userName?: string;
+  user?: { name: string };
   shiftDate: string;
   startTime: string;
   endTime: string;
   position?: string;
-  status: 'SCHEDULED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'NO_SHOW' | 'CANCELLED';
+  status: 'SCHEDULED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'NO_SHOW' | 'CANCELLED' | 'OPEN';
 }
 
 interface DraggableScheduleCalendarProps {
@@ -61,8 +62,10 @@ interface DraggableScheduleCalendarProps {
   onEditShift?: (shift: Shift) => void;
   onDeleteShift?: (shiftId: string) => void;
   onMoveShift?: (shiftId: string, newDate: string) => void;
+  onRequestSwap?: (shift: Shift) => void;
   isEditable?: boolean;
   isLoading?: boolean;
+  currentUserId?: string;
 }
 
 const statusColors: Record<Shift['status'], string> = {
@@ -72,17 +75,22 @@ const statusColors: Record<Shift['status'], string> = {
   COMPLETED: 'bg-rink-100 border-rink-300 text-rink-700',
   NO_SHOW: 'bg-red-100 border-red-300 text-red-800',
   CANCELLED: 'bg-rink-100 border-rink-200 text-rink-500 line-through',
+  OPEN: 'bg-purple-100 border-purple-300 text-purple-800',
 };
 
 // Draggable shift card
 function DraggableShift({
   shift,
   onEdit,
+  onRequestSwap,
   isEditable,
+  isOwnShift,
 }: {
   shift: Shift;
   onEdit?: (shift: Shift) => void;
+  onRequestSwap?: (shift: Shift) => void;
   isEditable?: boolean;
+  isOwnShift?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: shift.id,
@@ -105,6 +113,12 @@ function DraggableShift({
     }
   };
 
+  const displayName = shift.userName || shift.user?.name || 'Unknown';
+  const canSwap = isOwnShift &&
+    shift.status !== 'COMPLETED' &&
+    shift.status !== 'CANCELLED' &&
+    new Date(shift.shiftDate) > new Date();
+
   return (
     <div
       ref={setNodeRef}
@@ -112,10 +126,11 @@ function DraggableShift({
       {...attributes}
       {...listeners}
       className={clsx(
-        'p-2 rounded border text-xs cursor-grab active:cursor-grabbing transition-all',
+        'p-2 rounded border text-xs cursor-grab active:cursor-grabbing transition-all group relative',
         statusColors[shift.status],
         isDragging && 'opacity-50 shadow-lg ring-2 ring-ice-500',
-        !isEditable && 'cursor-pointer'
+        !isEditable && 'cursor-pointer',
+        isOwnShift && 'ring-1 ring-blue-400'
       )}
       onClick={(e) => {
         if (!isDragging) {
@@ -124,13 +139,29 @@ function DraggableShift({
         }
       }}
     >
-      <div className="font-medium truncate">{shift.userName}</div>
+      <div className="font-medium truncate">
+        {displayName}
+        {isOwnShift && <span className="ml-1 text-[10px] text-blue-600">(You)</span>}
+      </div>
       <div className="flex items-center gap-1 text-[10px] opacity-75">
         <ClockIcon className="w-3 h-3" />
         {formatShiftTime(shift.startTime)} - {formatShiftTime(shift.endTime)}
       </div>
       {shift.position && (
         <div className="mt-1 text-[10px] opacity-75">{shift.position}</div>
+      )}
+      {/* Swap button for own shifts */}
+      {canSwap && onRequestSwap && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRequestSwap(shift);
+          }}
+          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-[10px] transition-opacity"
+          title="Request swap"
+        >
+          Swap
+        </button>
       )}
     </div>
   );
@@ -145,7 +176,9 @@ function DroppableDay({
   onSelect,
   onAddShift,
   onEditShift,
+  onRequestSwap,
   isOver,
+  currentUserId,
   children,
 }: {
   date: Date;
@@ -155,7 +188,9 @@ function DroppableDay({
   onSelect: () => void;
   onAddShift?: () => void;
   onEditShift?: (shift: Shift) => void;
+  onRequestSwap?: (shift: Shift) => void;
   isOver: boolean;
+  currentUserId?: string;
   children?: React.ReactNode;
 }) {
   const { setNodeRef } = useDroppable({
@@ -179,7 +214,9 @@ function DroppableDay({
             key={shift.id}
             shift={shift}
             onEdit={onEditShift}
+            onRequestSwap={onRequestSwap}
             isEditable={isEditable}
+            isOwnShift={currentUserId ? shift.userId === currentUserId : false}
           />
         ))}
 
@@ -245,8 +282,10 @@ export function DraggableScheduleCalendar({
   onEditShift,
   onDeleteShift,
   onMoveShift,
+  onRequestSwap,
   isEditable = false,
   isLoading = false,
+  currentUserId,
 }: DraggableScheduleCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -552,7 +591,9 @@ export function DraggableScheduleCalendar({
                   onSelect={() => setSelectedDate(day)}
                   onAddShift={() => onAddShift?.(day)}
                   onEditShift={onEditShift}
+                  onRequestSwap={onRequestSwap}
                   isOver={isOverThisDay}
+                  currentUserId={currentUserId}
                 />
               </div>
             );
