@@ -125,7 +125,13 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         id: submissionId,
         formTemplateId: formId,
       },
-      include: {
+      select: {
+        id: true,
+        status: true,
+        reviewNotes: true,
+        isLocked: true,
+        lockedReason: true,
+        lockedAt: true,
         formTemplate: {
           select: { name: true, category: true },
         },
@@ -137,6 +143,26 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         { error: 'Submission not found' },
         { status: 404 }
       );
+    }
+
+    // Check if submission is locked (immutable)
+    // Locked submissions can only have their status/review updated, not their data
+    if (existingSubmission.isLocked) {
+      // Only allow status updates for review workflow on locked submissions
+      const allowedUpdates = ['status', 'reviewNotes'];
+      const updateKeys = Object.keys(validatedData).filter(k => validatedData[k as keyof typeof validatedData] !== undefined);
+      const hasDisallowedUpdates = updateKeys.some(k => !allowedUpdates.includes(k));
+
+      if (hasDisallowedUpdates) {
+        return NextResponse.json(
+          {
+            error: 'Submission is locked and cannot be modified',
+            reason: existingSubmission.lockedReason || 'This submission is immutable',
+            lockedAt: existingSubmission.lockedAt,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Build update data
@@ -235,7 +261,13 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         id: submissionId,
         formTemplateId: formId,
       },
-      include: {
+      select: {
+        id: true,
+        status: true,
+        submittedAt: true,
+        isLocked: true,
+        lockedReason: true,
+        lockedAt: true,
         formTemplate: {
           select: { name: true },
         },
@@ -246,6 +278,19 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json(
         { error: 'Submission not found' },
         { status: 404 }
+      );
+    }
+
+    // Check if submission is locked (immutable)
+    // Locked submissions cannot be deleted - they must be preserved for compliance
+    if (existingSubmission.isLocked) {
+      return NextResponse.json(
+        {
+          error: 'Submission is locked and cannot be deleted',
+          reason: existingSubmission.lockedReason || 'This submission is immutable and must be preserved',
+          lockedAt: existingSubmission.lockedAt,
+        },
+        { status: 403 }
       );
     }
 

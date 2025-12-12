@@ -20,6 +20,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { FieldPalette } from './FieldPalette';
 import { FormCanvas } from './FormCanvas';
 import { FieldProperties } from './FieldProperties';
+import { SaveDialog } from './SaveDialog';
 import { FormFieldConfig } from '@/types';
 import { FieldType, FormCategory } from '@prisma/client';
 import { Button } from '@/components/ui/Button';
@@ -29,6 +30,7 @@ import {
   EyeIcon,
   DocumentArrowDownIcon,
   CheckIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 
@@ -39,6 +41,7 @@ interface FormBuilderProps {
     description?: string;
     category: FormCategory;
     fields: FormFieldConfig[];
+    version?: number;
   };
   onSave: (data: {
     name: string;
@@ -46,10 +49,18 @@ interface FormBuilderProps {
     category: FormCategory;
     fields: FormFieldConfig[];
   }) => Promise<void>;
+  onSaveVersion?: (data: {
+    name: string;
+    description?: string;
+    category: FormCategory;
+    fields: FormFieldConfig[];
+    versionType: 'MAJOR' | 'MINOR';
+    changeNotes?: string;
+  }) => Promise<void>;
   onBack: () => void;
 }
 
-export function FormBuilder({ formId, initialData, onSave, onBack }: FormBuilderProps) {
+export function FormBuilder({ formId, initialData, onSave, onSaveVersion, onBack }: FormBuilderProps) {
   const [formName, setFormName] = useState(initialData?.name || 'Untitled Form');
   const [formDescription, setFormDescription] = useState(initialData?.description || '');
   const [formCategory, setFormCategory] = useState<FormCategory>(
@@ -60,6 +71,9 @@ export function FormBuilder({ formId, initialData, onSave, onBack }: FormBuilder
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+
+  const currentVersion = initialData?.version || 10; // Default to v1.0 (stored as 10)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -116,6 +130,12 @@ export function FormBuilder({ formId, initialData, onSave, onBack }: FormBuilder
       SIGNATURE: 'Signature',
       SECTION_HEADER: 'Section Title',
       INSTRUCTIONAL_TEXT: 'Instructions text here...',
+      RINK_DIAGRAM: 'Ice Rink Diagram',
+      DIVIDER: '',
+      AUTO_USER: 'Submitted By',
+      AUTO_DATE: 'Submission Date',
+      AUTO_FACILITY: 'Facility',
+      ICE_GRID: 'Ice Depth Measurements',
     };
     return labels[fieldType] || 'New Field';
   };
@@ -166,6 +186,13 @@ export function FormBuilder({ formId, initialData, onSave, onBack }: FormBuilder
   }, []);
 
   const handleSave = async () => {
+    // For existing forms with versioning support, show the save dialog
+    if (formId && onSaveVersion) {
+      setShowSaveDialog(true);
+      return;
+    }
+
+    // For new forms or without versioning, save directly
     setIsSaving(true);
     try {
       await onSave({
@@ -174,6 +201,25 @@ export function FormBuilder({ formId, initialData, onSave, onBack }: FormBuilder
         category: formCategory,
         fields,
       });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveWithVersion = async (options: { versionType: 'MAJOR' | 'MINOR'; changeNotes?: string }) => {
+    if (!onSaveVersion) return;
+
+    setIsSaving(true);
+    try {
+      await onSaveVersion({
+        name: formName,
+        description: formDescription,
+        category: formCategory,
+        fields,
+        versionType: options.versionType,
+        changeNotes: options.changeNotes,
+      });
+      setShowSaveDialog(false);
     } finally {
       setIsSaving(false);
     }
@@ -295,6 +341,15 @@ export function FormBuilder({ formId, initialData, onSave, onBack }: FormBuilder
           </DragOverlay>
         </DndContext>
       </div>
+
+      {/* Save Dialog for Version Control */}
+      <SaveDialog
+        isOpen={showSaveDialog}
+        onClose={() => setShowSaveDialog(false)}
+        onSave={handleSaveWithVersion}
+        currentVersion={currentVersion}
+        isLoading={isSaving}
+      />
     </div>
   );
 }

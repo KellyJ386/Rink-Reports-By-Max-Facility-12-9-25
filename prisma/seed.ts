@@ -421,6 +421,274 @@ async function main() {
   });
 
   // ============================================
+  // 6B. CREATE COMPREHENSIVE PRE-BUILT TEMPLATES
+  // ============================================
+  console.log('📝 Creating comprehensive pre-built templates...');
+
+  // 1. Daily Safety Checklist Template
+  const dailySafetyForm = await prisma.formTemplate.upsert({
+    where: { id: 'template-daily-safety' },
+    update: {},
+    create: {
+      id: 'template-daily-safety',
+      facilityId: facility.id,
+      createdById: facilityAdmin.id,
+      name: 'Daily Safety Checklist',
+      description: 'Comprehensive daily safety inspection for facility operations and compliance.',
+      category: FormCategory.FACILITY_CHECKLIST,
+      isPublished: true,
+      version: 10, // v1.0
+      includeUser: true,
+      includeTimestamp: true,
+      includeFacility: true,
+    },
+  });
+
+  await prisma.formField.createMany({
+    skipDuplicates: true,
+    data: [
+      { id: 'dsf-auto-user', formTemplateId: dailySafetyForm.id, fieldType: FieldType.AUTO_USER, label: 'Inspector', isRequired: true, orderIndex: 0 },
+      { id: 'dsf-auto-date', formTemplateId: dailySafetyForm.id, fieldType: FieldType.AUTO_DATE, label: 'Inspection Date', isRequired: true, orderIndex: 1 },
+      { id: 'dsf-auto-facility', formTemplateId: dailySafetyForm.id, fieldType: FieldType.AUTO_FACILITY, label: 'Facility', isRequired: true, orderIndex: 2 },
+      { id: 'dsf-div-1', formTemplateId: dailySafetyForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 3 },
+      { id: 'dsf-header-1', formTemplateId: dailySafetyForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Emergency Equipment', orderIndex: 4 },
+      { id: 'dsf-1', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'First aid kits fully stocked', isRequired: true, orderIndex: 5 },
+      { id: 'dsf-2', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'AED functional and accessible', isRequired: true, orderIndex: 6 },
+      { id: 'dsf-3', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'Fire extinguishers inspected', isRequired: true, orderIndex: 7 },
+      { id: 'dsf-4', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'Emergency exits clear and marked', isRequired: true, orderIndex: 8 },
+      { id: 'dsf-5', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'Emergency lighting functional', isRequired: true, orderIndex: 9 },
+      { id: 'dsf-div-2', formTemplateId: dailySafetyForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 10 },
+      { id: 'dsf-header-2', formTemplateId: dailySafetyForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Ice Surface Safety', orderIndex: 11 },
+      { id: 'dsf-6', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'Ice surface free of debris', isRequired: true, orderIndex: 12 },
+      { id: 'dsf-7', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'Boards and glass secure', isRequired: true, orderIndex: 13 },
+      { id: 'dsf-8', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'Gates functioning properly', isRequired: true, orderIndex: 14 },
+      { id: 'dsf-9', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'Player benches inspected', isRequired: true, orderIndex: 15 },
+      { id: 'dsf-10', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'Penalty boxes secure', isRequired: true, orderIndex: 16 },
+      { id: 'dsf-div-3', formTemplateId: dailySafetyForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 17 },
+      { id: 'dsf-header-3', formTemplateId: dailySafetyForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Facility Areas', orderIndex: 18 },
+      { id: 'dsf-11', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'Locker rooms clean and safe', isRequired: true, orderIndex: 19 },
+      { id: 'dsf-12', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'Restrooms clean with supplies', isRequired: true, orderIndex: 20 },
+      { id: 'dsf-13', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'Lobby and spectator areas clean', isRequired: true, orderIndex: 21 },
+      { id: 'dsf-14', formTemplateId: dailySafetyForm.id, fieldType: FieldType.CHECKBOX, label: 'Wet floor signs available', isRequired: true, orderIndex: 22 },
+      { id: 'dsf-div-4', formTemplateId: dailySafetyForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 23 },
+      { id: 'dsf-15', formTemplateId: dailySafetyForm.id, fieldType: FieldType.DROPDOWN, label: 'Overall Safety Rating', isRequired: true, orderIndex: 24, options: [{ value: 'excellent', label: 'Excellent - All items passed' }, { value: 'good', label: 'Good - Minor issues noted' }, { value: 'fair', label: 'Fair - Issues need attention' }, { value: 'poor', label: 'Poor - Immediate action required' }] },
+      { id: 'dsf-16', formTemplateId: dailySafetyForm.id, fieldType: FieldType.TEXTAREA, label: 'Issues Found / Corrective Actions', orderIndex: 25, maxLength: 1000 },
+      { id: 'dsf-17', formTemplateId: dailySafetyForm.id, fieldType: FieldType.SIGNATURE, label: 'Inspector Signature', isRequired: true, orderIndex: 26 },
+    ],
+  });
+
+  // 2. Enhanced Refrigeration Log Template
+  const enhancedRefrigForm = await prisma.formTemplate.upsert({
+    where: { id: 'template-refrigeration-log' },
+    update: {},
+    create: {
+      id: 'template-refrigeration-log',
+      facilityId: facility.id,
+      createdById: facilityAdmin.id,
+      name: 'Refrigeration System Log',
+      description: 'Comprehensive refrigeration plant monitoring with all critical readings.',
+      category: FormCategory.REFRIGERATION,
+      isPublished: true,
+      version: 10,
+      includeUser: true,
+      includeTimestamp: true,
+    },
+  });
+
+  await prisma.formField.createMany({
+    skipDuplicates: true,
+    data: [
+      { id: 'erf-auto-user', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.AUTO_USER, label: 'Technician', isRequired: true, orderIndex: 0 },
+      { id: 'erf-auto-date', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.AUTO_DATE, label: 'Reading Date/Time', isRequired: true, orderIndex: 1 },
+      { id: 'erf-shift', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.DROPDOWN, label: 'Shift', isRequired: true, orderIndex: 2, options: [{ value: 'morning', label: 'Morning (6AM-2PM)' }, { value: 'afternoon', label: 'Afternoon (2PM-10PM)' }, { value: 'night', label: 'Night (10PM-6AM)' }] },
+      { id: 'erf-div-1', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 3 },
+      { id: 'erf-header-1', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Compressor #1', orderIndex: 4 },
+      { id: 'erf-1', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.NUMBER, label: 'Suction Pressure (PSI)', isRequired: true, orderIndex: 5, minValue: 0, maxValue: 100 },
+      { id: 'erf-2', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.NUMBER, label: 'Discharge Pressure (PSI)', isRequired: true, orderIndex: 6, minValue: 100, maxValue: 300 },
+      { id: 'erf-3', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.NUMBER, label: 'Oil Pressure (PSI)', isRequired: true, orderIndex: 7, minValue: 30, maxValue: 80 },
+      { id: 'erf-4', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.DROPDOWN, label: 'Oil Level', isRequired: true, orderIndex: 8, options: [{ value: 'OK', label: 'OK' }, { value: 'LOW', label: 'Low' }, { value: 'CRITICAL', label: 'Critical' }] },
+      { id: 'erf-div-2', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 9 },
+      { id: 'erf-header-2', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Compressor #2', orderIndex: 10 },
+      { id: 'erf-5', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.NUMBER, label: 'Suction Pressure (PSI)', orderIndex: 11, minValue: 0, maxValue: 100 },
+      { id: 'erf-6', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.NUMBER, label: 'Discharge Pressure (PSI)', orderIndex: 12, minValue: 100, maxValue: 300 },
+      { id: 'erf-7', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.NUMBER, label: 'Oil Pressure (PSI)', orderIndex: 13, minValue: 30, maxValue: 80 },
+      { id: 'erf-8', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.DROPDOWN, label: 'Oil Level', orderIndex: 14, options: [{ value: 'OK', label: 'OK' }, { value: 'LOW', label: 'Low' }, { value: 'CRITICAL', label: 'Critical' }] },
+      { id: 'erf-div-3', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 15 },
+      { id: 'erf-header-3', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Brine System', orderIndex: 16 },
+      { id: 'erf-9', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.NUMBER, label: 'Brine Supply Temp (°F)', isRequired: true, orderIndex: 17, minValue: 10, maxValue: 30 },
+      { id: 'erf-10', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.NUMBER, label: 'Brine Return Temp (°F)', isRequired: true, orderIndex: 18, minValue: 10, maxValue: 35 },
+      { id: 'erf-11', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.NUMBER, label: 'Brine Flow (GPM)', orderIndex: 19, minValue: 0, maxValue: 500 },
+      { id: 'erf-div-4', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 20 },
+      { id: 'erf-header-4', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Condenser', orderIndex: 21 },
+      { id: 'erf-12', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.NUMBER, label: 'Condenser Water In (°F)', orderIndex: 22, minValue: 60, maxValue: 120 },
+      { id: 'erf-13', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.NUMBER, label: 'Condenser Water Out (°F)', orderIndex: 23, minValue: 70, maxValue: 130 },
+      { id: 'erf-div-5', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 24 },
+      { id: 'erf-14', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.TOGGLE, label: 'Any Alarms Present?', isRequired: true, orderIndex: 25 },
+      { id: 'erf-15', formTemplateId: enhancedRefrigForm.id, fieldType: FieldType.TEXTAREA, label: 'Alarm Details / Notes', orderIndex: 26, maxLength: 500 },
+    ],
+  });
+
+  // 3. Enhanced Air Quality Log Template
+  const enhancedAirQualityForm = await prisma.formTemplate.upsert({
+    where: { id: 'template-air-quality-log' },
+    update: {},
+    create: {
+      id: 'template-air-quality-log',
+      facilityId: facility.id,
+      createdById: facilityAdmin.id,
+      name: 'Air Quality Monitoring Log',
+      description: 'Track CO2, CO, and environmental conditions for occupant safety.',
+      category: FormCategory.AIR_QUALITY,
+      isPublished: true,
+      version: 10,
+      includeUser: true,
+      includeTimestamp: true,
+    },
+  });
+
+  await prisma.formField.createMany({
+    skipDuplicates: true,
+    data: [
+      { id: 'eaq-auto-user', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.AUTO_USER, label: 'Recorded By', isRequired: true, orderIndex: 0 },
+      { id: 'eaq-auto-date', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.AUTO_DATE, label: 'Reading Date/Time', isRequired: true, orderIndex: 1 },
+      { id: 'eaq-location', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.DROPDOWN, label: 'Monitoring Location', isRequired: true, orderIndex: 2, options: [{ value: 'rink-a-ice', label: 'Rink A - Ice Level' }, { value: 'rink-a-stands', label: 'Rink A - Spectator Stands' }, { value: 'rink-b-ice', label: 'Rink B - Ice Level' }, { value: 'rink-b-stands', label: 'Rink B - Spectator Stands' }, { value: 'lobby', label: 'Main Lobby' }, { value: 'locker-room', label: 'Locker Room Area' }, { value: 'mechanical', label: 'Mechanical Room' }] },
+      { id: 'eaq-div-1', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 3 },
+      { id: 'eaq-header-1', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Gas Levels', orderIndex: 4 },
+      { id: 'eaq-instr', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.INSTRUCTIONAL_TEXT, label: 'CO2: Normal <1000ppm, Action >2000ppm. CO: Normal <9ppm, Action >35ppm', orderIndex: 5 },
+      { id: 'eaq-1', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.NUMBER, label: 'CO₂ Level (ppm)', isRequired: true, orderIndex: 6, minValue: 0, maxValue: 10000 },
+      { id: 'eaq-2', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.NUMBER, label: 'CO Level (ppm)', isRequired: true, orderIndex: 7, minValue: 0, maxValue: 100 },
+      { id: 'eaq-3', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.NUMBER, label: 'NO₂ Level (ppm)', orderIndex: 8, minValue: 0, maxValue: 50 },
+      { id: 'eaq-div-2', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 9 },
+      { id: 'eaq-header-2', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Environmental Conditions', orderIndex: 10 },
+      { id: 'eaq-4', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.NUMBER, label: 'Ambient Temperature (°F)', isRequired: true, orderIndex: 11, minValue: 30, maxValue: 100 },
+      { id: 'eaq-5', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.NUMBER, label: 'Relative Humidity (%)', isRequired: true, orderIndex: 12, minValue: 0, maxValue: 100 },
+      { id: 'eaq-6', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.NUMBER, label: 'Dew Point (°F)', orderIndex: 13, minValue: -20, maxValue: 80 },
+      { id: 'eaq-div-3', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 14 },
+      { id: 'eaq-7', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.TOGGLE, label: 'Threshold Exceeded?', isRequired: true, orderIndex: 15 },
+      { id: 'eaq-8', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.MULTI_SELECT, label: 'Actions Taken (if threshold exceeded)', orderIndex: 16, options: [{ value: 'ventilation', label: 'Increased ventilation' }, { value: 'doors-opened', label: 'Doors opened' }, { value: 'evacuation', label: 'Area evacuated' }, { value: 'manager-notified', label: 'Manager notified' }, { value: 'zamboni-stopped', label: 'Zamboni operation stopped' }] },
+      { id: 'eaq-9', formTemplateId: enhancedAirQualityForm.id, fieldType: FieldType.TEXTAREA, label: 'Additional Notes', orderIndex: 17, maxLength: 500 },
+    ],
+  });
+
+  // 4. Incident Report Template (IMMUTABLE)
+  const incidentReportForm = await prisma.formTemplate.upsert({
+    where: { id: 'template-incident-report' },
+    update: {},
+    create: {
+      id: 'template-incident-report',
+      facilityId: facility.id,
+      createdById: facilityAdmin.id,
+      name: 'Incident Report',
+      description: 'Official incident documentation for injuries, accidents, and safety events. Submissions are locked for compliance.',
+      category: FormCategory.INCIDENT_REPORTING,
+      isPublished: true,
+      version: 10,
+      isImmutable: true, // CRITICAL: Incident reports cannot be modified after submission
+      includeUser: true,
+      includeTimestamp: true,
+      includeFacility: true,
+    },
+  });
+
+  await prisma.formField.createMany({
+    skipDuplicates: true,
+    data: [
+      { id: 'irf-auto-user', formTemplateId: incidentReportForm.id, fieldType: FieldType.AUTO_USER, label: 'Report Filed By', isRequired: true, orderIndex: 0 },
+      { id: 'irf-auto-date', formTemplateId: incidentReportForm.id, fieldType: FieldType.AUTO_DATE, label: 'Report Date', isRequired: true, orderIndex: 1 },
+      { id: 'irf-auto-facility', formTemplateId: incidentReportForm.id, fieldType: FieldType.AUTO_FACILITY, label: 'Facility', isRequired: true, orderIndex: 2 },
+      { id: 'irf-div-1', formTemplateId: incidentReportForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 3 },
+      { id: 'irf-header-1', formTemplateId: incidentReportForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Incident Details', orderIndex: 4 },
+      { id: 'irf-1', formTemplateId: incidentReportForm.id, fieldType: FieldType.DATETIME, label: 'Date and Time of Incident', isRequired: true, orderIndex: 5 },
+      { id: 'irf-2', formTemplateId: incidentReportForm.id, fieldType: FieldType.DROPDOWN, label: 'Incident Type', isRequired: true, orderIndex: 6, options: [{ value: 'injury-player', label: 'Player Injury' }, { value: 'injury-spectator', label: 'Spectator Injury' }, { value: 'injury-staff', label: 'Staff Injury' }, { value: 'slip-fall', label: 'Slip and Fall' }, { value: 'collision', label: 'Collision' }, { value: 'equipment', label: 'Equipment Malfunction' }, { value: 'property', label: 'Property Damage' }, { value: 'medical', label: 'Medical Emergency' }, { value: 'security', label: 'Security Incident' }, { value: 'other', label: 'Other' }] },
+      { id: 'irf-3', formTemplateId: incidentReportForm.id, fieldType: FieldType.DROPDOWN, label: 'Severity Level', isRequired: true, orderIndex: 7, options: [{ value: 'minor', label: 'Minor - First aid only' }, { value: 'moderate', label: 'Moderate - Medical attention recommended' }, { value: 'major', label: 'Major - Ambulance called' }, { value: 'critical', label: 'Critical - Life-threatening' }] },
+      { id: 'irf-4', formTemplateId: incidentReportForm.id, fieldType: FieldType.TEXT, label: 'Specific Location', isRequired: true, orderIndex: 8, placeholder: 'e.g., Rink A - near boards by penalty box' },
+      { id: 'irf-5', formTemplateId: incidentReportForm.id, fieldType: FieldType.RINK_DIAGRAM, label: 'Mark Location on Rink', orderIndex: 9 },
+      { id: 'irf-div-2', formTemplateId: incidentReportForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 10 },
+      { id: 'irf-header-2', formTemplateId: incidentReportForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Injured Party Information', orderIndex: 11 },
+      { id: 'irf-6', formTemplateId: incidentReportForm.id, fieldType: FieldType.TEXT, label: 'Name of Injured Person', isRequired: true, orderIndex: 12 },
+      { id: 'irf-7', formTemplateId: incidentReportForm.id, fieldType: FieldType.NUMBER, label: 'Age', orderIndex: 13, minValue: 0, maxValue: 120 },
+      { id: 'irf-8', formTemplateId: incidentReportForm.id, fieldType: FieldType.PHONE, label: 'Contact Phone', orderIndex: 14 },
+      { id: 'irf-9', formTemplateId: incidentReportForm.id, fieldType: FieldType.EMAIL, label: 'Contact Email', orderIndex: 15 },
+      { id: 'irf-10', formTemplateId: incidentReportForm.id, fieldType: FieldType.TEXT, label: 'Body Part Injured', orderIndex: 16 },
+      { id: 'irf-div-3', formTemplateId: incidentReportForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 17 },
+      { id: 'irf-header-3', formTemplateId: incidentReportForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Incident Description', orderIndex: 18 },
+      { id: 'irf-11', formTemplateId: incidentReportForm.id, fieldType: FieldType.TEXTAREA, label: 'Describe what happened', isRequired: true, orderIndex: 19, minLength: 50, maxLength: 2000, helpText: 'Provide a detailed description of the incident including what happened before, during, and after.' },
+      { id: 'irf-div-4', formTemplateId: incidentReportForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 20 },
+      { id: 'irf-header-4', formTemplateId: incidentReportForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Emergency Response', orderIndex: 21 },
+      { id: 'irf-12', formTemplateId: incidentReportForm.id, fieldType: FieldType.TOGGLE, label: 'Was ambulance called?', isRequired: true, orderIndex: 22 },
+      { id: 'irf-13', formTemplateId: incidentReportForm.id, fieldType: FieldType.TOGGLE, label: 'Was first aid administered?', isRequired: true, orderIndex: 23 },
+      { id: 'irf-14', formTemplateId: incidentReportForm.id, fieldType: FieldType.TEXTAREA, label: 'Treatment/First Aid Provided', orderIndex: 24, maxLength: 500 },
+      { id: 'irf-div-5', formTemplateId: incidentReportForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 25 },
+      { id: 'irf-header-5', formTemplateId: incidentReportForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Witnesses', orderIndex: 26 },
+      { id: 'irf-15', formTemplateId: incidentReportForm.id, fieldType: FieldType.TEXT, label: 'Witness 1 Name', orderIndex: 27 },
+      { id: 'irf-16', formTemplateId: incidentReportForm.id, fieldType: FieldType.PHONE, label: 'Witness 1 Contact', orderIndex: 28 },
+      { id: 'irf-17', formTemplateId: incidentReportForm.id, fieldType: FieldType.TEXT, label: 'Witness 2 Name', orderIndex: 29 },
+      { id: 'irf-18', formTemplateId: incidentReportForm.id, fieldType: FieldType.PHONE, label: 'Witness 2 Contact', orderIndex: 30 },
+      { id: 'irf-div-6', formTemplateId: incidentReportForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 31 },
+      { id: 'irf-header-6', formTemplateId: incidentReportForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Photos and Documentation', orderIndex: 32 },
+      { id: 'irf-19', formTemplateId: incidentReportForm.id, fieldType: FieldType.PHOTO, label: 'Incident Photos', orderIndex: 33, helpText: 'Upload photos of the incident scene, injuries (with consent), or damage' },
+      { id: 'irf-20', formTemplateId: incidentReportForm.id, fieldType: FieldType.FILE_UPLOAD, label: 'Additional Documents', orderIndex: 34 },
+      { id: 'irf-div-7', formTemplateId: incidentReportForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 35 },
+      { id: 'irf-21', formTemplateId: incidentReportForm.id, fieldType: FieldType.SIGNATURE, label: 'Reporter Signature', isRequired: true, orderIndex: 36 },
+      { id: 'irf-instr', formTemplateId: incidentReportForm.id, fieldType: FieldType.INSTRUCTIONAL_TEXT, label: 'By signing, I certify that the information provided is accurate and complete to the best of my knowledge.', orderIndex: 37 },
+    ],
+  });
+
+  // 5. Ice Resurfacing Log Template
+  const iceResurfacingForm = await prisma.formTemplate.upsert({
+    where: { id: 'template-ice-resurfacing' },
+    update: {},
+    create: {
+      id: 'template-ice-resurfacing',
+      facilityId: facility.id,
+      createdById: facilityAdmin.id,
+      name: 'Ice Resurfacing Log',
+      description: 'Track each ice cut/flood including equipment, conditions, and ice quality.',
+      category: FormCategory.ICE_OPERATIONS,
+      isPublished: true,
+      version: 10,
+      includeUser: true,
+      includeTimestamp: true,
+      includeWeather: true,
+    },
+  });
+
+  await prisma.formField.createMany({
+    skipDuplicates: true,
+    data: [
+      { id: 'isf-auto-user', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.AUTO_USER, label: 'Operator', isRequired: true, orderIndex: 0 },
+      { id: 'isf-auto-date', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.AUTO_DATE, label: 'Date/Time', isRequired: true, orderIndex: 1 },
+      { id: 'isf-1', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.DROPDOWN, label: 'Rink', isRequired: true, orderIndex: 2, options: [{ value: 'rink-a', label: 'Rink A - NHL Size' }, { value: 'rink-b', label: 'Rink B - Olympic Size' }] },
+      { id: 'isf-2', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.DROPDOWN, label: 'Machine Used', isRequired: true, orderIndex: 3, options: [{ value: 'zamboni-1', label: 'Zamboni #1' }, { value: 'zamboni-2', label: 'Zamboni #2' }] },
+      { id: 'isf-div-1', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 4 },
+      { id: 'isf-header-1', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Pre-Resurface Check', orderIndex: 5 },
+      { id: 'isf-3', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.NUMBER, label: 'Hour Meter Reading', isRequired: true, orderIndex: 6 },
+      { id: 'isf-4', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.CHECKBOX, label: 'Pre-operation circle check completed', isRequired: true, orderIndex: 7 },
+      { id: 'isf-5', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.DROPDOWN, label: 'Water Tank Level', isRequired: true, orderIndex: 8, options: [{ value: 'full', label: 'Full' }, { value: '75', label: '75%' }, { value: '50', label: '50%' }, { value: '25', label: '25%' }] },
+      { id: 'isf-6', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.DROPDOWN, label: 'Blade Condition', isRequired: true, orderIndex: 9, options: [{ value: 'new', label: 'New/Sharp' }, { value: 'good', label: 'Good' }, { value: 'fair', label: 'Fair' }, { value: 'needs-change', label: 'Needs Changing' }] },
+      { id: 'isf-div-2', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 10 },
+      { id: 'isf-header-2', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Resurfacing Details', orderIndex: 11 },
+      { id: 'isf-7', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.DROPDOWN, label: 'Cut Type', isRequired: true, orderIndex: 12, options: [{ value: 'light', label: 'Light Shave' }, { value: 'medium', label: 'Medium Cut' }, { value: 'heavy', label: 'Heavy Cut' }, { value: 'flood-only', label: 'Flood Only (No Cut)' }] },
+      { id: 'isf-8', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.NUMBER, label: 'Water Temperature (°F)', isRequired: true, orderIndex: 13, minValue: 32, maxValue: 180 },
+      { id: 'isf-9', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.NUMBER, label: 'Number of Passes', isRequired: true, orderIndex: 14, minValue: 1, maxValue: 5 },
+      { id: 'isf-10', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.NUMBER, label: 'Time to Complete (minutes)', orderIndex: 15, minValue: 5, maxValue: 30 },
+      { id: 'isf-div-3', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 16 },
+      { id: 'isf-header-3', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Ice Conditions', orderIndex: 17 },
+      { id: 'isf-11', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.NUMBER, label: 'Ambient Building Temp (°F)', orderIndex: 18, minValue: 40, maxValue: 80 },
+      { id: 'isf-12', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.NUMBER, label: 'Ice Surface Temp (°F)', orderIndex: 19, minValue: 15, maxValue: 30 },
+      { id: 'isf-13', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.NUMBER, label: 'Humidity (%)', orderIndex: 20, minValue: 0, maxValue: 100 },
+      { id: 'isf-14', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.ICE_GRID, label: 'Ice Depth Measurements', orderIndex: 21, helpText: 'Record ice thickness at measurement points' },
+      { id: 'isf-div-4', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.DIVIDER, label: '', orderIndex: 22 },
+      { id: 'isf-header-4', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.SECTION_HEADER, label: 'Post-Resurface Quality', orderIndex: 23 },
+      { id: 'isf-15', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.DROPDOWN, label: 'Ice Quality Rating', isRequired: true, orderIndex: 24, options: [{ value: 'excellent', label: 'Excellent - Competition Ready' }, { value: 'good', label: 'Good - Standard Use' }, { value: 'fair', label: 'Fair - Acceptable' }, { value: 'poor', label: 'Poor - Needs Attention' }] },
+      { id: 'isf-16', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.MULTI_SELECT, label: 'Issues Observed', orderIndex: 25, options: [{ value: 'snow-build', label: 'Snow buildup' }, { value: 'ruts', label: 'Ruts or grooves' }, { value: 'soft-spots', label: 'Soft spots' }, { value: 'chips', label: 'Chips or divots' }, { value: 'foggy', label: 'Foggy ice' }, { value: 'lines-faded', label: 'Lines faded' }] },
+      { id: 'isf-17', formTemplateId: iceResurfacingForm.id, fieldType: FieldType.TEXTAREA, label: 'Notes / Issues', orderIndex: 26, maxLength: 500 },
+    ],
+  });
+
+  console.log('✅ Created 5 comprehensive pre-built templates');
+
+  // ============================================
   // 7. CREATE ICE DEPTH READINGS
   // ============================================
   console.log('📏 Creating ice depth readings...');

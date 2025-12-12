@@ -476,3 +476,106 @@ export function useAllSubmissions(params?: {
     staleTime: 30000,
   });
 }
+
+// ========== Version Hooks ==========
+
+export interface FormVersion {
+  id: string;
+  formTemplateId: string;
+  version: number;
+  versionType: 'MAJOR' | 'MINOR' | 'RESTORE';
+  name: string;
+  description?: string;
+  fieldsSnapshot: FormField[];
+  changeNotes?: string;
+  changedById: string;
+  isActive: boolean;
+  createdAt: string;
+  changedBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+// Fetch form versions
+async function fetchFormVersions(formId: string): Promise<FormVersion[]> {
+  const response = await fetch(`/api/forms/${formId}/versions`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch form versions');
+  }
+  const data = await response.json();
+  return data.data;
+}
+
+// Create form version
+async function createFormVersion(
+  formId: string,
+  data: { versionType: 'MAJOR' | 'MINOR'; changeNotes?: string }
+): Promise<FormVersion> {
+  const response = await fetch(`/api/forms/${formId}/versions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create form version');
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+// Restore form version
+async function restoreFormVersion(formId: string, versionId: string): Promise<FormVersion> {
+  const response = await fetch(`/api/forms/${formId}/versions/${versionId}`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to restore form version');
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+// Hook to fetch form versions
+export function useFormVersions(formId: string) {
+  return useQuery({
+    queryKey: ['formVersions', formId],
+    queryFn: () => fetchFormVersions(formId),
+    enabled: !!formId,
+    staleTime: 30000,
+  });
+}
+
+// Hook to create a form version
+export function useCreateFormVersion(formId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: { versionType: 'MAJOR' | 'MINOR'; changeNotes?: string }) =>
+      createFormVersion(formId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['formVersions', formId] });
+      queryClient.invalidateQueries({ queryKey: ['forms', formId] });
+    },
+  });
+}
+
+// Hook to restore a form version
+export function useRestoreFormVersion(formId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (versionId: string) => restoreFormVersion(formId, versionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['formVersions', formId] });
+      queryClient.invalidateQueries({ queryKey: ['forms', formId] });
+    },
+  });
+}

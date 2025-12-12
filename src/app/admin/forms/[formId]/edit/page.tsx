@@ -3,7 +3,7 @@
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormBuilder } from '@/components/form-builder';
-import { useForm, useUpdateForm } from '@/hooks';
+import { useForm, useUpdateForm, useCreateFormVersion } from '@/hooks';
 import { FormFieldConfig } from '@/types';
 import { FormCategory } from '@prisma/client';
 
@@ -18,6 +18,7 @@ export default function EditFormPage({ params }: EditFormPageProps) {
 
   const { data: form, isLoading: isLoadingForm, error: fetchError } = useForm(formId);
   const updateFormMutation = useUpdateForm(formId);
+  const createVersionMutation = useCreateFormVersion(formId);
 
   const handleSave = async (data: {
     name: string;
@@ -64,6 +65,60 @@ export default function EditFormPage({ params }: EditFormPageProps) {
     }
   };
 
+  const handleSaveVersion = async (data: {
+    name: string;
+    description?: string;
+    category: FormCategory;
+    fields: FormFieldConfig[];
+    versionType: 'MAJOR' | 'MINOR';
+    changeNotes?: string;
+  }) => {
+    try {
+      setError(null);
+
+      // Transform fields to match API format
+      const formattedFields = data.fields.map((field, index) => ({
+        id: field.id || `field-${Date.now()}-${index}`,
+        fieldType: field.fieldType,
+        label: field.label,
+        placeholder: field.placeholder,
+        helpText: field.helpText,
+        isRequired: field.isRequired || false,
+        minValue: field.minValue,
+        maxValue: field.maxValue,
+        minLength: field.minLength,
+        maxLength: field.maxLength,
+        pattern: field.pattern,
+        options: field.options,
+        orderIndex: field.orderIndex ?? index,
+        sectionId: field.sectionId,
+        width: field.width || 'full',
+        conditionalLogic: field.conditionalLogic,
+        defaultValue: field.defaultValue,
+      }));
+
+      // First update the form
+      await updateFormMutation.mutateAsync({
+        name: data.name,
+        description: data.description,
+        category: data.category,
+        fields: formattedFields,
+      });
+
+      // Then create a version snapshot
+      await createVersionMutation.mutateAsync({
+        versionType: data.versionType,
+        changeNotes: data.changeNotes,
+      });
+
+      // Navigate back to forms list on success
+      router.push('/admin/forms');
+    } catch (err) {
+      console.error('Failed to save form version:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save form version');
+    }
+  };
+
   const handleBack = () => {
     router.push('/admin/forms');
   };
@@ -98,6 +153,7 @@ export default function EditFormPage({ params }: EditFormPageProps) {
     name: form.name,
     description: form.description || '',
     category: form.category as FormCategory,
+    version: form.version,
     fields: form.fields.map((field) => ({
       id: field.id,
       fieldType: field.fieldType as FormFieldConfig['fieldType'],
@@ -131,8 +187,8 @@ export default function EditFormPage({ params }: EditFormPageProps) {
         formId={formId}
         initialData={initialData}
         onSave={handleSave}
+        onSaveVersion={handleSaveVersion}
         onBack={handleBack}
-        isLoading={updateFormMutation.isPending}
       />
     </div>
   );

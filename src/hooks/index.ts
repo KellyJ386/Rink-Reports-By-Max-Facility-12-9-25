@@ -65,11 +65,15 @@ export {
   useToggleFormPublish,
   useCreateSubmission,
   useAllSubmissions,
+  useFormVersions,
+  useCreateFormVersion,
+  useRestoreFormVersion,
 } from './useFormSubmissions';
 export type {
   FormField,
   FormTemplate,
   FormSubmission,
+  FormVersion,
   SubmissionInput,
 } from './useFormSubmissions';
 

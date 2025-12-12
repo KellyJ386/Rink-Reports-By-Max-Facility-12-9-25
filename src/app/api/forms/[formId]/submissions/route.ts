@@ -244,17 +244,40 @@ export async function POST(
         };
       });
 
+    // Determine if submission should be locked (immutable)
+    // Incident reports are always immutable for compliance
+    const shouldLock = form.isImmutable || form.category === 'INCIDENT_REPORTING';
+
+    // Get the latest active version ID for this form (if versioning is enabled)
+    const latestVersion = await prisma.formVersion.findFirst({
+      where: {
+        formTemplateId: formId,
+        isActive: true,
+      },
+      orderBy: { version: 'desc' },
+    });
+
     // Create the submission with field responses
     const submission = await prisma.formSubmission.create({
       data: {
         formTemplateId: formId,
         submittedById: session.user.id,
         facilityId: facilityUser.facilityId,
+        formVersion: form.version,
+        formVersionId: latestVersion?.id,
         weatherData: validatedData.weatherData || undefined,
         deviceInfo: {
           userAgent: request.headers.get('user-agent') || 'unknown',
           platform: 'web',
         },
+        // Lock submission immediately if form is immutable (e.g., incident reports)
+        isLocked: shouldLock,
+        lockedAt: shouldLock ? new Date() : undefined,
+        lockedReason: shouldLock
+          ? form.category === 'INCIDENT_REPORTING'
+            ? 'Incident reports are locked for compliance purposes'
+            : 'This form type requires immutable submissions'
+          : undefined,
         fieldResponses: {
           create: fieldResponses,
         },

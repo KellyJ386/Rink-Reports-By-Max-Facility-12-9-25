@@ -272,8 +272,13 @@ enum FieldType {
   SIGNATURE
   SECTION_HEADER
   INSTRUCTIONAL_TEXT
+  DIVIDER           // Visual divider line
+  AUTO_USER         // Auto-populated current user
+  AUTO_DATE         // Auto-populated current date
+  AUTO_FACILITY     // Auto-populated facility name
   BODY_DIAGRAM      // For incident reports
   RINK_DIAGRAM      // For ice depth (read-only in form)
+  ICE_GRID          // Interactive ice depth measurement grid
 }
 
 model FormTemplate {
@@ -293,6 +298,9 @@ model FormTemplate {
   includeUser     Boolean      @default(true)
   includeFacility Boolean      @default(true)
 
+  // Immutability for incident reports
+  isImmutable     Boolean      @default(false)
+
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -303,9 +311,46 @@ model FormTemplate {
   submissions     FormSubmission[]
   recurringForms  RecurringForm[]
   formActions     FormAction[]
+  versions        FormVersion[]
 
   @@index([facilityId])
   @@index([category])
+}
+
+// Form Version History - stores snapshots of form structure
+model FormVersion {
+  id              String   @id @default(cuid())
+  formTemplateId  String
+  version         Int
+  versionType     VersionType @default(MINOR)
+
+  // Snapshot of form at this version
+  name            String
+  description     String?
+  fieldsSnapshot  Json     // Complete snapshot of fields at this version
+
+  // Change tracking
+  changeNotes     String?  @db.Text
+  changedById     String
+
+  // Status
+  isActive        Boolean  @default(false) // Only one version active at a time
+
+  createdAt       DateTime @default(now())
+
+  // Relations
+  formTemplate    FormTemplate @relation(fields: [formTemplateId], references: [id], onDelete: Cascade)
+  submissions     FormSubmission[]
+
+  @@unique([formTemplateId, version])
+  @@index([formTemplateId])
+  @@index([createdAt])
+}
+
+enum VersionType {
+  MAJOR    // Significant changes (v1.0 -> v2.0)
+  MINOR    // Small updates (v1.0 -> v1.1)
+  RESTORE  // Restored from previous version
 }
 
 model FormField {
@@ -352,6 +397,7 @@ model FormField {
 model FormSubmission {
   id              String   @id @default(cuid())
   formTemplateId  String
+  formVersionId   String?  // Links to specific version at time of submission
   facilityId      String
   submittedById   String
 
@@ -365,6 +411,11 @@ model FormSubmission {
   reviewedAt      DateTime?
   reviewNotes     String?
 
+  // Immutability (for incident reports - cannot be edited after submission)
+  isLocked        Boolean  @default(false)
+  lockedAt        DateTime?
+  lockedReason    String?  // e.g., "Incident report - immutable by policy"
+
   // Metadata
   deviceInfo      Json?    // { userAgent, platform }
   ipAddress       String?
@@ -373,13 +424,15 @@ model FormSubmission {
   updatedAt       DateTime @updatedAt
 
   // Relations
-  formTemplate    FormTemplate @relation(fields: [formTemplateId], references: [id])
-  facility        Facility     @relation(fields: [facilityId], references: [id])
-  submittedBy     User         @relation(fields: [submittedById], references: [id])
+  formTemplate    FormTemplate  @relation(fields: [formTemplateId], references: [id])
+  formVersion     FormVersion?  @relation(fields: [formVersionId], references: [id])
+  facility        Facility      @relation(fields: [facilityId], references: [id])
+  submittedBy     User          @relation(fields: [submittedById], references: [id])
   fieldResponses  FormFieldResponse[]
   attachments     Attachment[]
 
   @@index([formTemplateId])
+  @@index([formVersionId])
   @@index([facilityId])
   @@index([submittedById])
   @@index([submittedAt])
