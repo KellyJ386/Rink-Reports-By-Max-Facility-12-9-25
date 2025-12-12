@@ -6,6 +6,7 @@ import SignatureCanvas from 'react-signature-canvas';
 import { FormFieldConfig, WeatherData, ConditionalLogic, BodyInjury, IceDepthPoint } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { USAHockeyRink, RinkMarker } from '@/components/diagrams/USAHockeyRink';
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
@@ -805,21 +806,12 @@ function BodyDiagramField({
 // RINK DIAGRAM FIELD COMPONENT
 // ============================================
 
-interface RinkPoint {
-  id: string;
-  x: number;
-  y: number;
-  label: string;
-  value?: number | null;
-  description?: string;
-}
-
 interface RinkDiagramFieldProps {
   label: string;
   helpText?: string;
   isRequired: boolean;
-  points: RinkPoint[];
-  onChange: (points: RinkPoint[]) => void;
+  points: RinkMarker[];
+  onChange: (points: RinkMarker[]) => void;
   error?: string;
 }
 
@@ -831,36 +823,15 @@ function RinkDiagramField({
   onChange,
   error,
 }: RinkDiagramFieldProps) {
-  const [selectedPoint, setSelectedPoint] = useState<{ x: number; y: number } | null>(null);
-  const [pointLabel, setPointLabel] = useState('');
-  const [pointDescription, setPointDescription] = useState('');
-
-  const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setSelectedPoint({ x, y });
+  const handleAddMarker = (marker: Omit<RinkMarker, 'id'>) => {
+    const newMarker: RinkMarker = {
+      ...marker,
+      id: `marker-${Date.now()}`,
+    };
+    onChange([...points, newMarker]);
   };
 
-  const handleAddPoint = () => {
-    if (selectedPoint && pointLabel.trim()) {
-      const newPoint: RinkPoint = {
-        id: `point-${Date.now()}`,
-        x: selectedPoint.x,
-        y: selectedPoint.y,
-        label: pointLabel.trim(),
-        description: pointDescription.trim() || undefined,
-      };
-
-      onChange([...points, newPoint]);
-      setSelectedPoint(null);
-      setPointLabel('');
-      setPointDescription('');
-    }
-  };
-
-  const handleRemovePoint = (id: string) => {
+  const handleRemoveMarker = (id: string) => {
     onChange(points.filter((p) => p.id !== id));
   };
 
@@ -871,119 +842,11 @@ function RinkDiagramField({
         {isRequired && <span className="text-red-500 ml-1">*</span>}
       </label>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Rink Diagram SVG */}
-        <div className="relative bg-rink-50 rounded-lg p-4">
-          <svg
-            viewBox="0 0 100 50"
-            className="w-full cursor-crosshair"
-            style={{ filter: 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1))' }}
-            onClick={handleSvgClick}
-          >
-            <defs>
-              <linearGradient id="iceGradientField" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#e0f2fe" />
-                <stop offset="50%" stopColor="#bae6fd" />
-                <stop offset="100%" stopColor="#e0f2fe" />
-              </linearGradient>
-            </defs>
-
-            {/* Rink outline */}
-            <rect x="1" y="1" width="98" height="48" rx="10" ry="10" fill="url(#iceGradientField)" stroke="#0369a1" strokeWidth="0.5" />
-            {/* Center red line */}
-            <line x1="50" y1="1" x2="50" y2="49" stroke="#dc2626" strokeWidth="0.8" />
-            {/* Blue lines */}
-            <line x1="30" y1="1" x2="30" y2="49" stroke="#1d4ed8" strokeWidth="0.6" />
-            <line x1="70" y1="1" x2="70" y2="49" stroke="#1d4ed8" strokeWidth="0.6" />
-            {/* Goal lines */}
-            <line x1="10" y1="1" x2="10" y2="49" stroke="#dc2626" strokeWidth="0.4" />
-            <line x1="90" y1="1" x2="90" y2="49" stroke="#dc2626" strokeWidth="0.4" />
-            {/* Center circle */}
-            <circle cx="50" cy="25" r="8" fill="none" stroke="#1d4ed8" strokeWidth="0.4" />
-            <circle cx="50" cy="25" r="0.8" fill="#1d4ed8" />
-
-            {/* Existing points */}
-            {points.map((point, idx) => (
-              <g key={point.id}>
-                <circle cx={point.x} cy={point.y} r="2.5" fill="#0ea5e9" stroke="white" strokeWidth="0.3" />
-                <text x={point.x} y={point.y + 0.5} textAnchor="middle" dominantBaseline="middle" fontSize="1.5" fontWeight="bold" fill="white">
-                  {idx + 1}
-                </text>
-              </g>
-            ))}
-
-            {/* Selected point */}
-            {selectedPoint && (
-              <circle cx={selectedPoint.x} cy={selectedPoint.y} r="3" fill="none" stroke="#22c55e" strokeWidth="0.8" strokeDasharray="1,0.5" className="animate-pulse" />
-            )}
-          </svg>
-          <p className="text-center text-sm text-rink-500 mt-2">
-            Click on the rink to mark a location
-          </p>
-        </div>
-
-        {/* Point Input / List */}
-        <div className="space-y-4">
-          {selectedPoint && (
-            <div className="p-4 bg-ice-50 border border-ice-200 rounded-lg">
-              <h4 className="font-medium text-rink-900 mb-3">Add Location Details</h4>
-              <div className="space-y-3">
-                <Input
-                  label="Label"
-                  value={pointLabel}
-                  onChange={(e) => setPointLabel(e.target.value)}
-                  placeholder="e.g., Incident location, damage area..."
-                  required
-                />
-                <Input
-                  label="Description (optional)"
-                  value={pointDescription}
-                  onChange={(e) => setPointDescription(e.target.value)}
-                  placeholder="Additional details..."
-                />
-                <div className="flex gap-2">
-                  <Button type="button" onClick={handleAddPoint} disabled={!pointLabel.trim()}>
-                    <PlusIcon className="w-4 h-4 mr-2" />
-                    Add Point
-                  </Button>
-                  <Button type="button" variant="secondary" onClick={() => setSelectedPoint(null)}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Points List */}
-          <div>
-            <h4 className="font-medium text-rink-900 mb-2">Marked Locations ({points.length})</h4>
-            {points.length === 0 ? (
-              <p className="text-sm text-rink-500 py-4 text-center bg-rink-50 rounded-lg">
-                No locations marked yet
-              </p>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {points.map((point, idx) => (
-                  <div key={point.id} className="flex items-start gap-3 p-3 bg-ice-50 border border-ice-200 rounded-lg">
-                    <div className="w-6 h-6 bg-ice-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold">
-                      {idx + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-rink-900">{point.label}</p>
-                      {point.description && (
-                        <p className="text-sm text-rink-600">{point.description}</p>
-                      )}
-                    </div>
-                    <button type="button" onClick={() => handleRemovePoint(point.id)} className="p-1 text-rink-400 hover:text-red-600 rounded">
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <USAHockeyRink
+        markers={points}
+        onAddMarker={handleAddMarker}
+        onRemoveMarker={handleRemoveMarker}
+      />
 
       {helpText && <p className="form-help">{helpText}</p>}
       {error && <p className="form-error">{error}</p>}
