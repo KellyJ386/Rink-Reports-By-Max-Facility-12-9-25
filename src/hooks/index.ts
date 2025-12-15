@@ -400,3 +400,36 @@ export type {
   OfflineStatus,
   SyncResult,
 } from './useOffline';
+
+// Daily Reports hooks
+export {
+  useDailyReportTabs,
+  useDailyReportTab,
+  useCreateDailyReportTab,
+  useUpdateDailyReportTab,
+  useDeleteDailyReportTab,
+  useReorderDailyReportTabs,
+  useDailyReportSessions,
+  useDailyReportSession,
+  useCreateOrGetSession,
+  useUpdateDailyReportSession,
+  useCompleteSession,
+  useDailyReportTabSubmissions,
+  useCreateTabSubmission,
+  useUpdateTabSubmission,
+  useTodaySession,
+  useUserTabs,
+  TAB_CATEGORY_META,
+  SHIFT_TYPE_META,
+} from './useDailyReports';
+export type {
+  DailyReportTabCategory,
+  DailyReportTab,
+  DailyReportTabRole,
+  DailyReportSession,
+  DailyReportTabSubmission,
+  ShiftType,
+  SessionStatus,
+  TabStatus,
+  ReviewStatus,
+} from './useDailyReports';

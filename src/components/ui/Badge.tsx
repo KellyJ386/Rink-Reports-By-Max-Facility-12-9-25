@@ -51,7 +51,14 @@ export function Badge({ children, variant = 'neutral', size = 'md', dot = false,
 }
 
 // Status-specific badges for common use cases
-export function StatusBadge({ status }: { status: string }) {
+interface StatusBadgeProps {
+  status: string;
+  size?: 'sm' | 'md';
+  className?: string;
+  children?: ReactNode;
+}
+
+export function StatusBadge({ status, size, className, children }: StatusBadgeProps) {
   const statusMap: Record<string, { variant: BadgeVariant; label: string }> = {
     DRAFT: { variant: 'neutral', label: 'Draft' },
     SUBMITTED: { variant: 'info', label: 'Submitted' },
@@ -65,13 +72,20 @@ export function StatusBadge({ status }: { status: string }) {
     PENDING: { variant: 'warning', label: 'Pending' },
     ACTIVE: { variant: 'success', label: 'Active' },
     INACTIVE: { variant: 'neutral', label: 'Inactive' },
+    IN_PROGRESS: { variant: 'warning', label: 'In Progress' },
+    COMPLETED: { variant: 'success', label: 'Completed' },
+    REVIEWED: { variant: 'info', label: 'Reviewed' },
+    success: { variant: 'success', label: '' },
+    warning: { variant: 'warning', label: '' },
+    info: { variant: 'info', label: '' },
+    danger: { variant: 'danger', label: '' },
   };
 
   const config = statusMap[status] || { variant: 'neutral' as BadgeVariant, label: status };
 
   return (
-    <Badge variant={config.variant} dot>
-      {config.label}
+    <Badge variant={config.variant} dot size={size} className={className}>
+      {children || config.label}
     </Badge>
   );
 }

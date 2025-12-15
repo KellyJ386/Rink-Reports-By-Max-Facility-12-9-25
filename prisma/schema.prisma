@@ -90,6 +90,12 @@ model User {
   notificationsSent NotificationLog[] @relation("NotificationSender")
   scheduledReportsCreated ScheduledReport[] @relation("ScheduledReportCreator")
 
+  // Daily Report relations
+  sessionsStarted DailyReportSession[] @relation("SessionStarter")
+  sessionsCompleted DailyReportSession[] @relation("SessionCompleter")
+  tabSubmissions DailyReportTabSubmission[] @relation("TabSubmitter")
+  tabReviews DailyReportTabSubmission[] @relation("TabReviewer")
+
   @@index([email])
   @@index([role])
 }
@@ -155,6 +161,8 @@ model Facility {
   weatherCache    WeatherCache?
   notificationLogs NotificationLog[]
   scheduledReports ScheduledReport[]
+  dailyReportTabs DailyReportTab[]
+  dailyReportSessions DailyReportSession[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -312,6 +320,7 @@ model FormTemplate {
   recurringForms  RecurringForm[]
   formActions     FormAction[]
   versions        FormVersion[]
+  dailyReportTabs DailyReportTab[]
 
   @@index([facilityId])
   @@index([category])
@@ -430,6 +439,7 @@ model FormSubmission {
   submittedBy     User          @relation(fields: [submittedById], references: [id])
   fieldResponses  FormFieldResponse[]
   attachments     Attachment[]
+  dailyReportTabSubmissions DailyReportTabSubmission[]
 
   @@index([formTemplateId])
   @@index([formVersionId])
@@ -1673,4 +1683,191 @@ model FacilityGroupMember {
 
   @@unique([facilityGroupId, facilityId])
   @@index([facilityId])
+}
+
+// ============================================
+// DAILY REPORT MODULE
+// ============================================
+
+// Default Tab Categories - up to 15 tabs per facility
+enum DailyReportTabCategory {
+  FRONT_DESK
+  CUSTODIAL
+  PRO_SHOP
+  CONCESSIONS
+  LEARN_TO_SKATE
+  PUBLIC_SESSIONS
+  SAFETY_EMERGENCY
+  GENERAL_FACILITY
+  LOCKER_ROOMS
+  MAINTENANCE
+  EVENTS
+  HOCKEY_PROGRAMS
+  FIGURE_SKATING
+  RENTALS
+  CUSTOM
+}
+
+// Tab configuration for each facility
+model DailyReportTab {
+  id              String   @id @default(cuid())
+  facilityId      String
+
+  // Tab configuration
+  name            String                    // Display name (admin can customize)
+  category        DailyReportTabCategory    // Base category type
+  description     String?                   // Optional description
+  icon            String?                   // Optional icon name (heroicons)
+  color           String?                   // Tab accent color
+
+  // Ordering and visibility
+  orderIndex      Int                       // Tab display order (0-14)
+  isActive        Boolean  @default(true)   // Enable/disable tab
+
+  // Form association - each tab links to a form template
+  formTemplateId  String?                   // Associated form from form builder
+
+  // Settings
+  requiresCompletion Boolean @default(false) // Must complete before shift handoff
+  allowMultipleSubmissions Boolean @default(true) // Can submit multiple times per shift
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  facility        Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  formTemplate    FormTemplate? @relation(fields: [formTemplateId], references: [id], onDelete: SetNull)
+  roleAssignments DailyReportTabRole[]
+  submissions     DailyReportTabSubmission[]
+
+  @@unique([facilityId, orderIndex])
+  @@unique([facilityId, name])
+  @@index([facilityId, isActive])
+}
+
+// Role assignments for tabs - which roles can see/submit each tab
+model DailyReportTabRole {
+  id              String   @id @default(cuid())
+  tabId           String
+  role            UserRole
+
+  // Permission levels
+  canView         Boolean  @default(true)
+  canSubmit       Boolean  @default(true)
+  canReview       Boolean  @default(false)
+
+  createdAt       DateTime @default(now())
+
+  tab             DailyReportTab @relation(fields: [tabId], references: [id], onDelete: Cascade)
+
+  @@unique([tabId, role])
+  @@index([tabId])
+  @@index([role])
+}
+
+// Session represents a shift/day's daily report collection
+model DailyReportSession {
+  id              String   @id @default(cuid())
+  facilityId      String
+
+  // Session info
+  shiftDate       DateTime @db.Date          // The date of the shift
+  shiftType       ShiftType @default(MORNING) // Morning/Afternoon/Night
+
+  // Status tracking
+  status          DailyReportSessionStatus @default(IN_PROGRESS)
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  // User tracking
+  startedById     String                    // User who started the session
+  completedById   String?                   // User who completed/handed off
+
+  // Handoff notes
+  handoffSummary  String?  @db.Text         // End of shift summary
+  handoffNotes    String?  @db.Text         // Notes for next shift
+
+  // Metadata
+  weatherData     Json?                     // Weather at start of shift
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  facility        Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  startedBy       User @relation("SessionStarter", fields: [startedById], references: [id])
+  completedBy     User? @relation("SessionCompleter", fields: [completedById], references: [id])
+  tabSubmissions  DailyReportTabSubmission[]
+
+  @@unique([facilityId, shiftDate, shiftType])
+  @@index([facilityId, shiftDate])
+  @@index([status])
+}
+
+enum ShiftType {
+  MORNING     // 6AM - 2PM
+  AFTERNOON   // 2PM - 10PM
+  NIGHT       // 10PM - 6AM
+  ALL_DAY     // Single shift facilities
+}
+
+enum DailyReportSessionStatus {
+  IN_PROGRESS
+  PENDING_HANDOFF
+  COMPLETED
+  CANCELLED
+}
+
+// Individual tab submissions within a session
+model DailyReportTabSubmission {
+  id              String   @id @default(cuid())
+  sessionId       String
+  tabId           String
+
+  // Link to the actual form submission
+  formSubmissionId String?                  // Links to FormSubmission if form-based
+
+  // Quick status for tabs without forms
+  status          DailyReportTabStatus @default(NOT_STARTED)
+
+  // For simple checkbox-style tabs
+  checklistData   Json?                     // Quick checklist items
+  notes           String?  @db.Text
+
+  // Tracking
+  submittedById   String
+  submittedAt     DateTime @default(now())
+
+  // Review workflow
+  reviewedById    String?
+  reviewedAt      DateTime?
+  reviewStatus    ReviewStatus?
+  reviewNotes     String?
+
+  // Relations
+  session         DailyReportSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tab             DailyReportTab @relation(fields: [tabId], references: [id], onDelete: Cascade)
+  formSubmission  FormSubmission? @relation(fields: [formSubmissionId], references: [id], onDelete: SetNull)
+  submittedBy     User @relation("TabSubmitter", fields: [submittedById], references: [id])
+  reviewedBy      User? @relation("TabReviewer", fields: [reviewedById], references: [id])
+
+  @@unique([sessionId, tabId, submittedAt])
+  @@index([sessionId])
+  @@index([tabId])
+  @@index([submittedById])
+}
+
+enum DailyReportTabStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  REVIEWED
+  FLAGGED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  NEEDS_REVISION
+  REJECTED
 }
