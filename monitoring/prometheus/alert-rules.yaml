@@ -1,0 +1,273 @@
+# Prometheus Alert Rules for MFO
+
+groups:
+  # Application Alerts
+  - name: mfo-application
+    rules:
+      - alert: MFOHighErrorRate
+        expr: |
+          sum(rate(http_requests_total{job="mfo-web",status=~"5.."}[5m])) /
+          sum(rate(http_requests_total{job="mfo-web"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: High error rate in MFO application
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+
+      - alert: MFOHighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="mfo-web"}[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: High latency in MFO application
+          description: "95th percentile latency is {{ $value | humanizeDuration }}"
+
+      - alert: MFOHighLatencyCritical
+        expr: |
+          histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job="mfo-web"}[5m])) by (le)) > 5
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: Critical latency in MFO application
+          description: "99th percentile latency is {{ $value | humanizeDuration }}"
+
+      - alert: MFOPodNotReady
+        expr: |
+          kube_pod_status_ready{namespace="mfo-production",condition="true"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: MFO pod not ready
+          description: "Pod {{ $labels.pod }} has been not ready for 5 minutes"
+
+      - alert: MFOPodCrashLooping
+        expr: |
+          rate(kube_pod_container_status_restarts_total{namespace="mfo-production"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: MFO pod is crash looping
+          description: "Pod {{ $labels.pod }} is restarting frequently"
+
+      - alert: MFOHighMemoryUsage
+        expr: |
+          container_memory_usage_bytes{namespace="mfo-production",container!=""} /
+          container_spec_memory_limit_bytes{namespace="mfo-production",container!=""} > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: High memory usage in MFO container
+          description: "Container {{ $labels.container }} memory usage is {{ $value | humanizePercentage }}"
+
+      - alert: MFOHighCPUUsage
+        expr: |
+          rate(container_cpu_usage_seconds_total{namespace="mfo-production",container!=""}[5m]) /
+          container_spec_cpu_quota{namespace="mfo-production",container!=""} * 100000 > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: High CPU usage in MFO container
+          description: "Container {{ $labels.container }} CPU usage is {{ $value | humanizePercentage }}"
+
+  # Database Alerts
+  - name: mfo-database
+    rules:
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: database
+        annotations:
+          summary: PostgreSQL is down
+          description: "PostgreSQL instance is not responding"
+
+      - alert: PostgresHighConnections
+        expr: |
+          pg_stat_activity_count / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: High PostgreSQL connection usage
+          description: "PostgreSQL connection usage is {{ $value | humanizePercentage }}"
+
+      - alert: PostgresSlowQueries
+        expr: |
+          rate(pg_stat_statements_seconds_total[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: Slow queries detected in PostgreSQL
+          description: "Average query time is {{ $value | humanizeDuration }}"
+
+      - alert: PostgresReplicationLag
+        expr: |
+          pg_replication_lag > 30
+        for: 5m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: PostgreSQL replication lag
+          description: "Replication lag is {{ $value }} seconds"
+
+      - alert: PostgresDiskSpaceLow
+        expr: |
+          pg_database_size_bytes / (1024 * 1024 * 1024) > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: PostgreSQL disk space running low
+          description: "Database size is {{ $value | humanize1024 }}B"
+
+  # Cache Alerts
+  - name: mfo-cache
+    rules:
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: Redis is down
+          description: "Redis instance is not responding"
+
+      - alert: RedisHighMemory
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: Redis memory usage high
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+
+      - alert: RedisHighConnectionCount
+        expr: redis_connected_clients > 1000
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: High Redis connection count
+          description: "Redis has {{ $value }} connected clients"
+
+      - alert: RedisCacheMissRateHigh
+        expr: |
+          rate(redis_keyspace_misses_total[5m]) /
+          (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: High Redis cache miss rate
+          description: "Cache miss rate is {{ $value | humanizePercentage }}"
+
+  # Infrastructure Alerts
+  - name: mfo-infrastructure
+    rules:
+      - alert: NodeHighCPU
+        expr: |
+          100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: High CPU usage on node
+          description: "Node {{ $labels.instance }} CPU usage is {{ $value }}%"
+
+      - alert: NodeHighMemory
+        expr: |
+          (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: High memory usage on node
+          description: "Node {{ $labels.instance }} memory usage is {{ $value }}%"
+
+      - alert: NodeDiskSpaceLow
+        expr: |
+          (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: Low disk space on node
+          description: "Node {{ $labels.instance }} disk usage is {{ $value }}%"
+
+      - alert: NodeNotReady
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: Kubernetes node not ready
+          description: "Node {{ $labels.node }} is not ready"
+
+      - alert: PodOOMKilled
+        expr: |
+          kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+        for: 0m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: Pod was OOM killed
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} was OOM killed"
+
+  # SLA Alerts
+  - name: mfo-sla
+    rules:
+      - alert: SLAAvailabilityBreach
+        expr: |
+          (1 - sum(rate(http_requests_total{job="mfo-web",status=~"5.."}[30m])) /
+          sum(rate(http_requests_total{job="mfo-web"}[30m]))) < 0.999
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+          sla: availability
+        annotations:
+          summary: SLA availability breach
+          description: "Availability is {{ $value | humanizePercentage }}, below 99.9% SLA"
+
+      - alert: SLALatencyBreach
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="mfo-web"}[30m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          sla: latency
+        annotations:
+          summary: SLA latency breach
+          description: "95th percentile latency is {{ $value | humanizeDuration }}, above 500ms SLA"

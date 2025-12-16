@@ -1,0 +1,27 @@
+# Auto-assign reviewers configuration
+
+# Number of reviewers to assign
+numberOfReviewers: 2
+
+# Add reviewers from the list
+addReviewers: true
+
+# Review groups (assign from these groups)
+reviewGroups:
+  frontend:
+    - developer1
+    - developer2
+  backend:
+    - developer3
+    - developer4
+
+# Skip if the author is one of these users
+skipUsers:
+  - dependabot[bot]
+  - renovate[bot]
+
+# Filter by files changed
+filterLabels:
+  include: []
+  exclude:
+    - skip-review

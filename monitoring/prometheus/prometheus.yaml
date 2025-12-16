@@ -1,0 +1,161 @@
+# Prometheus Configuration for MFO
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: mfo-production
+    env: production
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Rule files
+rule_files:
+  - /etc/prometheus/rules/*.yaml
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # MFO Application
+  - job_name: mfo-web
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - mfo-production
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_component]
+        action: replace
+        target_label: component
+
+  # Kubernetes API Server
+  - job_name: kubernetes-apiservers
+    kubernetes_sd_configs:
+      - role: endpoints
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+
+  # Kubernetes Nodes
+  - job_name: kubernetes-nodes
+    kubernetes_sd_configs:
+      - role: node
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+
+  # Kubernetes Node Exporter
+  - job_name: kubernetes-node-exporter
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: (.+):(.+)
+        replacement: $1:9100
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+
+  # Kubernetes cAdvisor
+  - job_name: kubernetes-cadvisor
+    kubernetes_sd_configs:
+      - role: node
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+    metrics_path: /metrics/cadvisor
+
+  # Kubernetes Services
+  - job_name: kubernetes-services
+    kubernetes_sd_configs:
+      - role: service
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_probe]
+        action: keep
+        regex: true
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+      - source_labels: [__param_target]
+        target_label: instance
+      - action: labelmap
+        regex: __meta_kubernetes_service_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: service
+
+  # PostgreSQL Exporter
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # Redis Exporter
+  - job_name: redis
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # NGINX Ingress Controller
+  - job_name: nginx-ingress
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - ingress-nginx
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        action: keep
+        regex: ingress-nginx
+      - source_labels: [__meta_kubernetes_pod_container_port_number]
+        action: keep
+        regex: "10254"

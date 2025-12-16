@@ -1,0 +1,258 @@
+# Kubernetes CronJobs for Automated Backups
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-backup
+  namespace: mfo
+  labels:
+    app: mfo
+    component: backup
+spec:
+  # Run every hour
+  schedule: "0 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800  # 30 minutes timeout
+      template:
+        metadata:
+          labels:
+            app: mfo
+            component: backup
+            job: database-backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: mfo-backup
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+            - name: backup
+              image: postgres:15-alpine
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  apk add --no-cache aws-cli gzip
+                  /scripts/database-backup.sh
+              env:
+                - name: DB_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: mfo-secrets
+                      key: database-host
+                - name: DB_PORT
+                  value: "5432"
+                - name: DB_NAME
+                  value: mfo
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: mfo-secrets
+                      key: database-user
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: mfo-secrets
+                      key: database-password
+                - name: BACKUP_BUCKET
+                  value: mfo-backups
+                - name: BACKUP_PREFIX
+                  value: database
+                - name: AWS_REGION
+                  value: us-east-1
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+                  readOnly: true
+          volumes:
+            - name: scripts
+              configMap:
+                name: backup-scripts
+                defaultMode: 0755
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: s3-backup
+  namespace: mfo
+  labels:
+    app: mfo
+    component: backup
+spec:
+  # Run every 6 hours
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600  # 1 hour timeout
+      template:
+        metadata:
+          labels:
+            app: mfo
+            component: backup
+            job: s3-backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: mfo-backup
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+            - name: backup
+              image: amazon/aws-cli:latest
+              command:
+                - /bin/sh
+                - /scripts/s3-backup.sh
+              env:
+                - name: SOURCE_BUCKET
+                  value: mfo-uploads
+                - name: BACKUP_BUCKET
+                  value: mfo-backups
+                - name: BACKUP_PREFIX
+                  value: uploads
+                - name: AWS_REGION
+                  value: us-east-1
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+                  readOnly: true
+          volumes:
+            - name: scripts
+              configMap:
+                name: backup-scripts
+                defaultMode: 0755
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-verification
+  namespace: mfo
+  labels:
+    app: mfo
+    component: backup
+spec:
+  # Run daily at 2 AM
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app: mfo
+            component: backup
+            job: backup-verification
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: mfo-backup
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+            - name: verify
+              image: postgres:15-alpine
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  apk add --no-cache aws-cli gzip curl
+                  DRY_RUN=true /scripts/database-restore.sh latest.sql.gz
+              env:
+                - name: BACKUP_BUCKET
+                  value: mfo-backups
+                - name: BACKUP_PREFIX
+                  value: database
+                - name: AWS_REGION
+                  value: us-east-1
+                - name: SLACK_WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: mfo-secrets
+                      key: slack-webhook-url
+                      optional: true
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+                  readOnly: true
+          volumes:
+            - name: scripts
+              configMap:
+                name: backup-scripts
+                defaultMode: 0755
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mfo-backup
+  namespace: mfo
+  annotations:
+    # IAM role for S3 access (IRSA)
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/mfo-backup-role
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mfo-backup
+  namespace: mfo
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mfo-backup
+  namespace: mfo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mfo-backup
+subjects:
+  - kind: ServiceAccount
+    name: mfo-backup
+    namespace: mfo

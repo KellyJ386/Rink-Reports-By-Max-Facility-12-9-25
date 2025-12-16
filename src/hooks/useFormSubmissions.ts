@@ -1,0 +1,581 @@
+'use client';
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+// Types
+export interface FormField {
+  id: string;
+  fieldType: string;
+  label: string;
+  placeholder?: string;
+  helpText?: string;
+  isRequired: boolean;
+  minValue?: number | null;
+  maxValue?: number | null;
+  minLength?: number | null;
+  maxLength?: number | null;
+  pattern?: string | null;
+  options?: Array<{ value: string; label: string }> | null;
+  orderIndex: number;
+  sectionId?: string | null;
+  width: 'full' | 'half' | 'third';
+  conditionalLogic?: {
+    showIf: {
+      fieldId: string;
+      operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than';
+      value: string | number | boolean;
+    };
+  } | null;
+  defaultValue?: string | null;
+}
+
+export interface FormTemplate {
+  id: string;
+  facilityId: string;
+  name: string;
+  description?: string;
+  category: string;
+  isPublished: boolean;
+  isActive: boolean;
+  version: number;
+  includeWeather: boolean;
+  includeTimestamp: boolean;
+  includeUser: boolean;
+  includeFacility: boolean;
+  fields: FormField[];
+  facility?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  createdBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  _count?: {
+    submissions: number;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FormSubmission {
+  id: string;
+  formTemplateId: string;
+  submittedById: string;
+  facilityId: string;
+  formVersion: number;
+  data: Record<string, unknown>;
+  weatherData?: {
+    temperature?: number;
+    humidity?: number;
+    conditions?: string;
+  };
+  location?: {
+    latitude?: number;
+    longitude?: number;
+  };
+  submittedAt: string;
+  submittedBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  facility?: {
+    id: string;
+    name: string;
+  };
+  formTemplate?: {
+    id: string;
+    name: string;
+    category: string;
+  };
+}
+
+export interface SubmissionInput {
+  data: Record<string, unknown>;
+  weatherData?: {
+    temperature?: number;
+    humidity?: number;
+    conditions?: string;
+  };
+  location?: {
+    latitude?: number;
+    longitude?: number;
+  };
+}
+
+// Fetch forms
+async function fetchForms(params?: {
+  facilityId?: string;
+  category?: string;
+  published?: boolean;
+}): Promise<FormTemplate[]> {
+  const searchParams = new URLSearchParams();
+  if (params?.facilityId) searchParams.append('facilityId', params.facilityId);
+  if (params?.category) searchParams.append('category', params.category);
+  if (params?.published !== undefined) searchParams.append('published', params.published.toString());
+
+  const response = await fetch(`/api/forms?${searchParams.toString()}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch forms');
+  }
+  const data = await response.json();
+  return data.data;
+}
+
+// Fetch single form
+async function fetchForm(formId: string): Promise<FormTemplate> {
+  const response = await fetch(`/api/forms/${formId}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch form');
+  }
+  const data = await response.json();
+  return data.data;
+}
+
+// Fetch submissions for a form
+async function fetchSubmissions(
+  formId: string,
+  params?: {
+    page?: number;
+    limit?: number;
+    startDate?: string;
+    endDate?: string;
+    userId?: string;
+  }
+): Promise<{
+  submissions: FormSubmission[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalCount: number;
+    totalPages: number;
+  };
+}> {
+  const searchParams = new URLSearchParams();
+  if (params?.page) searchParams.append('page', params.page.toString());
+  if (params?.limit) searchParams.append('limit', params.limit.toString());
+  if (params?.startDate) searchParams.append('startDate', params.startDate);
+  if (params?.endDate) searchParams.append('endDate', params.endDate);
+  if (params?.userId) searchParams.append('userId', params.userId);
+
+  const response = await fetch(`/api/forms/${formId}/submissions?${searchParams.toString()}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch submissions');
+  }
+  const data = await response.json();
+  return {
+    submissions: data.data,
+    pagination: data.pagination,
+  };
+}
+
+// Create submission
+async function createSubmission(
+  formId: string,
+  input: SubmissionInput
+): Promise<FormSubmission> {
+  const response = await fetch(`/api/forms/${formId}/submissions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create submission');
+  }
+
+  const data = await response.json();
+  return data.data;
+}
+
+// Create form
+async function createForm(data: {
+  facilityId: string;
+  name: string;
+  description?: string;
+  category: string;
+  fields: Array<{
+    id: string;
+    fieldType: string;
+    label: string;
+    placeholder?: string;
+    helpText?: string;
+    isRequired: boolean;
+    minValue?: number;
+    maxValue?: number;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+    options?: Array<{ value: string; label: string }>;
+    orderIndex: number;
+    sectionId?: string;
+    width?: 'full' | 'half' | 'third';
+    conditionalLogic?: {
+      showIf: {
+        fieldId: string;
+        operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than';
+        value: string | number | boolean;
+      };
+    };
+    defaultValue?: string;
+  }>;
+  includeWeather?: boolean;
+  includeTimestamp?: boolean;
+  includeUser?: boolean;
+  includeFacility?: boolean;
+}): Promise<FormTemplate> {
+  const response = await fetch('/api/forms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create form');
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+// ========== Hooks ==========
+
+// Hook to create a form
+export function useCreateForm() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createForm,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
+    },
+  });
+}
+
+// Update form
+async function updateForm(formId: string, data: {
+  name?: string;
+  description?: string;
+  category?: string;
+  isPublished?: boolean;
+  fields?: Array<{
+    id: string;
+    fieldType: string;
+    label: string;
+    placeholder?: string;
+    helpText?: string;
+    isRequired: boolean;
+    minValue?: number;
+    maxValue?: number;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+    options?: Array<{ value: string; label: string }>;
+    orderIndex: number;
+    sectionId?: string;
+    width?: 'full' | 'half' | 'third';
+    conditionalLogic?: {
+      showIf: {
+        fieldId: string;
+        operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than';
+        value: string | number | boolean;
+      };
+    };
+    defaultValue?: string;
+  }>;
+  includeWeather?: boolean;
+  includeTimestamp?: boolean;
+  includeUser?: boolean;
+  includeFacility?: boolean;
+}): Promise<FormTemplate> {
+  const response = await fetch(`/api/forms/${formId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update form');
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+// Hook to update a form
+export function useUpdateForm(formId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: Parameters<typeof updateForm>[1]) => updateForm(formId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
+      queryClient.invalidateQueries({ queryKey: ['forms', formId] });
+    },
+  });
+}
+
+// Clone form
+async function cloneForm(formId: string, newName?: string): Promise<FormTemplate> {
+  const response = await fetch(`/api/forms/${formId}/clone`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: newName }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to clone form');
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+// Hook to clone a form
+export function useCloneForm() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ formId, newName }: { formId: string; newName?: string }) => cloneForm(formId, newName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
+    },
+  });
+}
+
+// Delete form
+async function deleteForm(formId: string): Promise<void> {
+  const response = await fetch(`/api/forms/${formId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete form');
+  }
+}
+
+// Hook to delete a form
+export function useDeleteForm() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteForm,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
+    },
+  });
+}
+
+// Publish/unpublish form
+async function toggleFormPublish(formId: string, isPublished: boolean): Promise<FormTemplate> {
+  return updateForm(formId, { isPublished });
+}
+
+// Hook to publish/unpublish a form
+export function useToggleFormPublish() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ formId, isPublished }: { formId: string; isPublished: boolean }) =>
+      toggleFormPublish(formId, isPublished),
+    onSuccess: (_, { formId }) => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
+      queryClient.invalidateQueries({ queryKey: ['forms', formId] });
+    },
+  });
+}
+
+// Hook to fetch all forms
+export function useForms(params?: {
+  facilityId?: string;
+  category?: string;
+  published?: boolean;
+}) {
+  return useQuery({
+    queryKey: ['forms', params],
+    queryFn: () => fetchForms(params),
+    staleTime: 60000, // 1 minute
+  });
+}
+
+// Hook to fetch a single form
+export function useForm(formId: string) {
+  return useQuery({
+    queryKey: ['forms', formId],
+    queryFn: () => fetchForm(formId),
+    enabled: !!formId,
+    staleTime: 30000,
+  });
+}
+
+// Hook to fetch submissions for a form
+export function useFormSubmissions(
+  formId: string,
+  params?: {
+    page?: number;
+    limit?: number;
+    startDate?: string;
+    endDate?: string;
+    userId?: string;
+  }
+) {
+  return useQuery({
+    queryKey: ['formSubmissions', formId, params],
+    queryFn: () => fetchSubmissions(formId, params),
+    enabled: !!formId,
+    staleTime: 30000,
+  });
+}
+
+// Hook to create a submission
+export function useCreateSubmission(formId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: SubmissionInput) => createSubmission(formId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['formSubmissions', formId] });
+      queryClient.invalidateQueries({ queryKey: ['forms', formId] });
+    },
+  });
+}
+
+// Hook to get all submissions across forms (for dashboard)
+export function useAllSubmissions(params?: {
+  page?: number;
+  limit?: number;
+  category?: string;
+  startDate?: string;
+  endDate?: string;
+}) {
+  return useQuery({
+    queryKey: ['allSubmissions', params],
+    queryFn: async () => {
+      const searchParams = new URLSearchParams();
+      if (params?.page) searchParams.append('page', params.page.toString());
+      if (params?.limit) searchParams.append('limit', params.limit.toString());
+      if (params?.category) searchParams.append('category', params.category);
+      if (params?.startDate) searchParams.append('startDate', params.startDate);
+      if (params?.endDate) searchParams.append('endDate', params.endDate);
+
+      const response = await fetch(`/api/forms/submissions?${searchParams.toString()}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch submissions');
+      }
+      const data = await response.json();
+      return data;
+    },
+    staleTime: 30000,
+  });
+}
+
+// ========== Version Hooks ==========
+
+export interface FormVersion {
+  id: string;
+  formTemplateId: string;
+  version: number;
+  versionType: 'MAJOR' | 'MINOR' | 'RESTORE';
+  name: string;
+  description?: string;
+  fieldsSnapshot: FormField[];
+  changeNotes?: string;
+  changedById: string;
+  isActive: boolean;
+  createdAt: string;
+  changedBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+// Fetch form versions
+async function fetchFormVersions(formId: string): Promise<FormVersion[]> {
+  const response = await fetch(`/api/forms/${formId}/versions`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch form versions');
+  }
+  const data = await response.json();
+  return data.data;
+}
+
+// Create form version
+async function createFormVersion(
+  formId: string,
+  data: { versionType: 'MAJOR' | 'MINOR'; changeNotes?: string }
+): Promise<FormVersion> {
+  const response = await fetch(`/api/forms/${formId}/versions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create form version');
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+// Restore form version
+async function restoreFormVersion(formId: string, versionId: string): Promise<FormVersion> {
+  const response = await fetch(`/api/forms/${formId}/versions/${versionId}`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to restore form version');
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+// Hook to fetch form versions
+export function useFormVersions(formId: string) {
+  return useQuery({
+    queryKey: ['formVersions', formId],
+    queryFn: () => fetchFormVersions(formId),
+    enabled: !!formId,
+    staleTime: 30000,
+  });
+}
+
+// Hook to create a form version
+export function useCreateFormVersion(formId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: { versionType: 'MAJOR' | 'MINOR'; changeNotes?: string }) =>
+      createFormVersion(formId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['formVersions', formId] });
+      queryClient.invalidateQueries({ queryKey: ['forms', formId] });
+    },
+  });
+}
+
+// Hook to restore a form version
+export function useRestoreFormVersion(formId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (versionId: string) => restoreFormVersion(formId, versionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['formVersions', formId] });
+      queryClient.invalidateQueries({ queryKey: ['forms', formId] });
+    },
+  });
+}

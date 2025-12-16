@@ -14,6 +14,7 @@ declare module 'next-auth' {
       name?: string | null;
       image?: string | null;
       role: UserRole;
+      facilityId?: string | null;
     };
   }
 
@@ -23,6 +24,7 @@ declare module 'next-auth' {
     name?: string | null;
     image?: string | null;
     role: UserRole;
+    facilityId?: string | null;
   }
 }
 
@@ -30,6 +32,7 @@ declare module 'next-auth/jwt' {
   interface JWT {
     id: string;
     role: UserRole;
+    facilityId?: string | null;
   }
 }
 
@@ -94,12 +97,23 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+
+        // Fetch user's primary facility
+        const facilityUser = await prisma.facilityUser.findFirst({
+          where: { userId: user.id, isActive: true },
+          orderBy: { createdAt: 'asc' },
+          select: { facilityId: true },
+        });
+        token.facilityId = facilityUser?.facilityId || null;
       }
 
       // Handle session updates
       if (trigger === 'update' && session) {
         token.name = session.name;
         token.role = session.role;
+        if (session.facilityId !== undefined) {
+          token.facilityId = session.facilityId;
+        }
       }
 
       return token;
@@ -108,6 +122,7 @@ export const authOptions: NextAuthOptions = {
       if (token) {
         session.user.id = token.id;
         session.user.role = token.role;
+        session.user.facilityId = token.facilityId;
       }
       return session;
     },

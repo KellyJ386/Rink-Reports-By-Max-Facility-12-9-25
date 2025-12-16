@@ -1,7 +1,63 @@
-import { UserRole, FormCategory, FieldType, SeverityLevel } from '@prisma/client';
+import { UserRole, FormCategory, FieldType, SeverityLevel, ThresholdModule, NotificationChannel } from '@prisma/client';
 
 // Re-export Prisma enums
-export { UserRole, FormCategory, FieldType, SeverityLevel };
+export { UserRole, FormCategory, FieldType, SeverityLevel, ThresholdModule, NotificationChannel };
+
+// Threshold Configuration types
+export interface ThresholdConfig {
+  id: string;
+  facilityId: string;
+  rinkId?: string | null;
+  rinkName?: string;
+  module: ThresholdModule;
+  parameterName: string;
+  minValue?: number | null;
+  maxValue?: number | null;
+  warningMin?: number | null;
+  warningMax?: number | null;
+  alertEnabled: boolean;
+  alertSeverity: SeverityLevel;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NotificationConfigData {
+  id: string;
+  facilityId: string;
+  module: ThresholdModule;
+  alertSeverity: SeverityLevel;
+  recipientRole?: UserRole | null;
+  recipientUserId?: string | null;
+  recipientName?: string;
+  channels: NotificationChannel[];
+  isEnabled: boolean;
+  requiresAck: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Default threshold values for different modules
+export const DEFAULT_THRESHOLDS: Record<ThresholdModule, Record<string, { min?: number; max?: number; warningMin?: number; warningMax?: number; unit: string; label: string }>> = {
+  ICE_DEPTH: {
+    ice_depth: { min: 0.75, max: 1.5, warningMin: 0.85, warningMax: 1.4, unit: 'inches', label: 'Ice Depth' },
+  },
+  REFRIGERATION: {
+    brine_supply: { min: 10, max: 22, warningMin: 12, warningMax: 20, unit: '°F', label: 'Brine Supply Temp' },
+    brine_return: { min: 14, max: 26, warningMin: 16, warningMax: 24, unit: '°F', label: 'Brine Return Temp' },
+    compressor_suction: { min: 20, max: 40, warningMin: 22, warningMax: 38, unit: 'PSI', label: 'Compressor Suction' },
+    compressor_discharge: { min: 150, max: 250, warningMin: 160, warningMax: 240, unit: 'PSI', label: 'Compressor Discharge' },
+    condenser_in: { min: 70, max: 105, warningMin: 75, warningMax: 100, unit: '°F', label: 'Condenser In Temp' },
+    condenser_out: { min: 80, max: 115, warningMin: 85, warningMax: 110, unit: '°F', label: 'Condenser Out Temp' },
+    oil_pressure: { min: 30, max: 80, warningMin: 35, warningMax: 75, unit: 'PSI', label: 'Oil Pressure' },
+  },
+  AIR_QUALITY: {
+    co2_level: { max: 1000, warningMax: 800, unit: 'ppm', label: 'CO2 Level' },
+    co_level: { max: 25, warningMax: 15, unit: 'ppm', label: 'CO Level' },
+    temperature: { min: 45, max: 65, warningMin: 48, warningMax: 62, unit: '°F', label: 'Temperature' },
+    humidity: { min: 30, max: 60, warningMin: 35, warningMax: 55, unit: '%', label: 'Humidity' },
+  },
+};
 
 // User types
 export interface SessionUser {
@@ -92,11 +148,55 @@ export interface IceDepthPoint {
   x: number;
   y: number;
   depth: number | null;
+  label?: string; // Optional custom label for the point
 }
 
 export interface IceDepthConfig {
-  points: 25 | 35 | 47;
+  points: number; // Now supports any number of points
   layout: IceDepthPoint[];
+}
+
+// Custom Diagram Configuration
+export interface CustomDiagramConfig {
+  id: string;
+  name: string;
+  description?: string;
+  rinkType: 'standard' | 'olympic' | 'recreational' | 'curling' | 'custom';
+  dimensions: {
+    length: number; // feet
+    width: number;  // feet
+  };
+  points: IceDepthPoint[];
+  createdAt: Date;
+  updatedAt: Date;
+  isDefault?: boolean;
+}
+
+// Preset diagram types
+export type PresetDiagramType = '25-point' | '35-point' | '47-point' | 'custom';
+
+// Bluetooth Device types for ice depth measurement
+export interface BluetoothDevice {
+  id: string;
+  name: string;
+  connected: boolean;
+  batteryLevel?: number;
+  lastReading?: number;
+  lastReadingTime?: Date;
+}
+
+export interface BluetoothReading {
+  deviceId: string;
+  value: number;
+  unit: 'inches' | 'mm' | 'cm';
+  timestamp: Date;
+  signalStrength?: number;
+}
+
+export interface BluetoothConnectionState {
+  status: 'disconnected' | 'connecting' | 'connected' | 'error';
+  device: BluetoothDevice | null;
+  error?: string;
 }
 
 // Incident Report types

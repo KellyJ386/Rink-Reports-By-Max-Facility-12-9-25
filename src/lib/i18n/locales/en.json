@@ -1,0 +1,171 @@
+{
+  "common": {
+    "appName": "Max Facility Operations",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import",
+    "close": "Close",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "submit": "Submit",
+    "yes": "Yes",
+    "no": "No",
+    "all": "All",
+    "none": "None",
+    "select": "Select",
+    "required": "Required",
+    "optional": "Optional"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "signUp": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot Password?",
+    "resetPassword": "Reset Password",
+    "confirmPassword": "Confirm Password",
+    "rememberMe": "Remember me",
+    "invalidCredentials": "Invalid email or password",
+    "sessionExpired": "Your session has expired. Please sign in again."
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "incidents": "Incidents",
+    "iceDepth": "Ice Depth",
+    "schedule": "Schedule",
+    "forms": "Forms",
+    "reports": "Reports",
+    "settings": "Settings",
+    "help": "Help"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome, {{name}}",
+    "overview": "Overview",
+    "recentActivity": "Recent Activity",
+    "alerts": "Active Alerts",
+    "stats": {
+      "formsSubmitted": "Forms Submitted",
+      "iceReadings": "Ice Readings",
+      "openIncidents": "Open Incidents",
+      "scheduledShifts": "Scheduled Shifts"
+    }
+  },
+  "incidents": {
+    "title": "Incidents",
+    "newIncident": "New Incident",
+    "reportIncident": "Report Incident",
+    "incidentType": "Incident Type",
+    "severity": "Severity",
+    "location": "Location",
+    "description": "Description",
+    "status": "Status",
+    "reportedBy": "Reported By",
+    "reportedAt": "Reported At",
+    "noIncidents": "No incidents found",
+    "severityLevels": {
+      "minor": "Minor",
+      "moderate": "Moderate",
+      "serious": "Serious",
+      "critical": "Critical"
+    },
+    "statusTypes": {
+      "reported": "Reported",
+      "investigating": "Investigating",
+      "resolved": "Resolved",
+      "closed": "Closed"
+    },
+    "types": {
+      "injury": "Injury",
+      "equipment": "Equipment Failure",
+      "ice": "Ice Condition",
+      "facility": "Facility Issue",
+      "other": "Other"
+    }
+  },
+  "iceDepth": {
+    "title": "Ice Depth Analysis",
+    "newReading": "New Reading",
+    "readings": "Readings",
+    "analysis": "Analysis",
+    "depth": "Depth",
+    "averageDepth": "Average Depth",
+    "minDepth": "Minimum Depth",
+    "maxDepth": "Maximum Depth",
+    "temperature": "Temperature",
+    "humidity": "Humidity",
+    "noReadings": "No readings found",
+    "selectRink": "Select Rink"
+  },
+  "schedule": {
+    "title": "Staff Schedule",
+    "addShift": "Add Shift",
+    "editShift": "Edit Shift",
+    "employee": "Employee",
+    "startTime": "Start Time",
+    "endTime": "End Time",
+    "position": "Position",
+    "notes": "Notes",
+    "noShifts": "No shifts scheduled"
+  },
+  "forms": {
+    "title": "Forms",
+    "newSubmission": "New Submission",
+    "formType": "Form Type",
+    "submittedBy": "Submitted By",
+    "submittedAt": "Submitted At",
+    "status": "Status",
+    "noSubmissions": "No form submissions found"
+  },
+  "settings": {
+    "title": "Settings",
+    "general": "General",
+    "profile": "Profile",
+    "notifications": "Notifications",
+    "security": "Security",
+    "appearance": "Appearance",
+    "language": "Language",
+    "theme": "Theme",
+    "themes": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "notFound": "Page not found",
+    "unauthorized": "You are not authorized to view this page",
+    "forbidden": "Access denied",
+    "validation": "Please check your input and try again",
+    "network": "Network error. Please check your connection."
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "minLength": "Must be at least {{min}} characters",
+    "maxLength": "Must be no more than {{max}} characters",
+    "min": "Must be at least {{min}}",
+    "max": "Must be no more than {{max}}",
+    "pattern": "Invalid format"
+  },
+  "time": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "thisWeek": "This Week",
+    "lastWeek": "Last Week",
+    "thisMonth": "This Month",
+    "lastMonth": "Last Month"
+  }
+}

@@ -20,6 +20,11 @@ import {
   PencilSquareIcon,
   ChatBubbleBottomCenterTextIcon,
   InformationCircleIcon,
+  MinusIcon,
+  UserIcon,
+  BuildingOfficeIcon,
+  TableCellsIcon,
+  MapIcon,
 } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 import { FieldType } from '@prisma/client';
@@ -62,6 +67,18 @@ const mediaFields: FieldDefinition[] = [
 const layoutFields: FieldDefinition[] = [
   { type: 'SECTION_HEADER', label: 'Section Header', icon: ChatBubbleBottomCenterTextIcon, description: 'Section title' },
   { type: 'INSTRUCTIONAL_TEXT', label: 'Instructions', icon: InformationCircleIcon, description: 'Help text' },
+  { type: 'DIVIDER', label: 'Divider', icon: MinusIcon, description: 'Visual separator' },
+];
+
+const autoFields: FieldDefinition[] = [
+  { type: 'AUTO_USER', label: 'Auto User', icon: UserIcon, description: 'Current user name' },
+  { type: 'AUTO_DATE', label: 'Auto Date', icon: CalendarIcon, description: 'Submission date' },
+  { type: 'AUTO_FACILITY', label: 'Auto Facility', icon: BuildingOfficeIcon, description: 'Facility name' },
+];
+
+const rinkFields: FieldDefinition[] = [
+  { type: 'RINK_DIAGRAM', label: 'Rink Diagram', icon: MapIcon, description: 'Interactive rink map' },
+  { type: 'ICE_GRID', label: 'Ice Depth Grid', icon: TableCellsIcon, description: 'Ice measurements' },
 ];
 
 function DraggableField({ field }: { field: FieldDefinition }) {
@@ -129,6 +146,8 @@ export function FieldPalette() {
         <FieldGroup title="Selection" fields={selectionFields} />
         <FieldGroup title="Date & Time" fields={dateTimeFields} />
         <FieldGroup title="Media" fields={mediaFields} />
+        <FieldGroup title="Rink Specific" fields={rinkFields} />
+        <FieldGroup title="Auto-Populate" fields={autoFields} />
         <FieldGroup title="Layout" fields={layoutFields} />
       </div>
     </div>

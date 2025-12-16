@@ -40,7 +40,7 @@ const mainNavigation: NavigationItem[] = [
   { name: 'Incidents', href: '/dashboard/incidents', icon: ExclamationTriangleIcon },
   { name: 'Refrigeration', href: '/dashboard/refrigeration', icon: BeakerIcon },
   { name: 'Air Quality', href: '/dashboard/air-quality', icon: CloudIcon },
-  { name: 'Scheduling', href: '/dashboard/scheduling', icon: CalendarDaysIcon },
+  { name: 'Scheduling', href: '/dashboard/schedule', icon: CalendarDaysIcon },
   { name: 'Checklists', href: '/dashboard/checklists', icon: CheckCircleIcon },
 ];
 

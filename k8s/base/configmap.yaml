@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mfo-config
+  namespace: mfo
+  labels:
+    app.kubernetes.io/name: max-facility-operations
+    app.kubernetes.io/component: config
+data:
+  # Application Settings
+  NODE_ENV: "production"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+  # Server Configuration
+  PORT: "3000"
+  HOSTNAME: "0.0.0.0"
+
+  # Feature Flags
+  ENABLE_ANALYTICS: "true"
+  ENABLE_REALTIME: "true"
+  ENABLE_PWA: "true"
+
+  # Cache Settings
+  REDIS_DB: "0"
+  CACHE_TTL: "3600"
+
+  # Rate Limiting
+  RATE_LIMIT_WINDOW_MS: "60000"
+  RATE_LIMIT_MAX_REQUESTS: "100"
+
+  # Logging
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+
+  # Health Check
+  HEALTH_CHECK_PATH: "/api/health"
+  READINESS_CHECK_PATH: "/api/ready"

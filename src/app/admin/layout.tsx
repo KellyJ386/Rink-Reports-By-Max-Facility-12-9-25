@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { DashboardLayout } from '@/components/layout';
+import { AdminLayout as AdminLayoutComponent } from '@/components/admin/AdminLayout';
 import { canAccessFormBuilder } from '@/types';
 import { UserRole } from '@prisma/client';
 
@@ -22,5 +22,5 @@ export default async function AdminLayout({
     redirect('/dashboard');
   }
 
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return <AdminLayoutComponent>{children}</AdminLayoutComponent>;
 }

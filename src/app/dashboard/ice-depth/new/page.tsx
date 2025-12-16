@@ -2,25 +2,39 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { RinkDiagram, useIceDepthPoints, DepthInputPanel, DepthStats } from '@/components/ice-depth';
+import {
+  RinkDiagram,
+  useIceDepthPoints,
+  DepthInputPanel,
+  DepthStats,
+  BluetoothInput,
+} from '@/components/ice-depth';
+import { useCreateIceDepthReading } from '@/hooks';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
 import {
   ArrowLeftIcon,
   CheckIcon,
   ArrowPathIcon,
+  SignalIcon,
 } from '@heroicons/react/24/outline';
+import { BluetoothReading, BluetoothConnectionState } from '@/types';
 
 export default function NewIceDepthPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rinkName = searchParams.get('rink') || 'Rink A - Main';
+  const rinkId = searchParams.get('rinkId') || '';
 
   const [pointsConfig] = useState<25 | 35 | 47>(25);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [showBluetooth, setShowBluetooth] = useState(false);
+  const [bluetoothStatus, setBluetoothStatus] = useState<BluetoothConnectionState['status']>('disconnected');
+  const [lastBluetoothReading, setLastBluetoothReading] = useState<number | null>(null);
 
   const { points, updatePoint, resetPoints, getStats } = useIceDepthPoints(pointsConfig);
+  const createReadingMutation = useCreateIceDepthReading();
 
   const stats = getStats();
   const measuredCount = points.filter((p) => p.depth !== null).length;
@@ -55,20 +69,66 @@ export default function NewIceDepthPage() {
     }
   }, [currentIndex, points]);
 
+  // Handle Bluetooth reading - automatically update selected point and move to next
+  const handleBluetoothReading = useCallback(
+    (reading: BluetoothReading) => {
+      const depthValue = Math.round(reading.value * 100) / 100; // Round to 2 decimal places
+      setLastBluetoothReading(depthValue);
+
+      if (selectedPointId) {
+        updatePoint(selectedPointId, depthValue);
+
+        // Auto-advance to next unmeasured point
+        const currentIdx = points.findIndex((p) => p.pointId === selectedPointId);
+        const nextUnmeasured = points.findIndex(
+          (p, i) => i > currentIdx && p.depth === null
+        );
+
+        if (nextUnmeasured !== -1) {
+          setSelectedPointId(points[nextUnmeasured].pointId);
+        } else {
+          // If no more unmeasured points after current, find any unmeasured point
+          const anyUnmeasured = points.find((p) => p.depth === null);
+          if (anyUnmeasured) {
+            setSelectedPointId(anyUnmeasured.pointId);
+          }
+        }
+      }
+    },
+    [selectedPointId, points, updatePoint]
+  );
+
+  const handleBluetoothConnectionChange = useCallback(
+    (state: BluetoothConnectionState) => {
+      setBluetoothStatus(state.status);
+    },
+    []
+  );
+
   const handleSave = async () => {
-    setIsSaving(true);
+    if (!rinkId) {
+      alert('Please select a rink from the Ice Depth page to save readings.');
+      return;
+    }
+
     try {
-      // TODO: Save to database via API
-      console.log('Saving ice depth reading:', {
-        rinkName,
-        points,
-        stats,
+      const readingPoints = points.map((p) => ({
+        pointId: p.pointId,
+        x: p.x,
+        y: p.y,
+        depth: p.depth,
+      }));
+
+      await createReadingMutation.mutateAsync({
+        rinkId,
+        pointsConfig,
+        readingPoints,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
       router.push('/dashboard/ice-depth');
-    } finally {
-      setIsSaving(false);
+    } catch (error) {
+      console.error('Failed to save reading:', error);
+      alert('Failed to save reading. Please try again.');
     }
   };
 
@@ -76,6 +136,7 @@ export default function NewIceDepthPage() {
     if (confirm('Are you sure you want to reset all measurements?')) {
       resetPoints();
       setSelectedPointId(null);
+      setLastBluetoothReading(null);
     }
   };
 
@@ -84,10 +145,13 @@ export default function NewIceDepthPage() {
     setSelectedPointId(points[0].pointId);
   }
 
+  // Check if Bluetooth is supported
+  const isBluetoothSupported = typeof navigator !== 'undefined' && 'bluetooth' in navigator;
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -97,11 +161,20 @@ export default function NewIceDepthPage() {
             Back
           </Button>
           <div>
-            <h1 className="page-title">New Ice Depth Reading</h1>
-            <p className="page-description">{rinkName}</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">New Ice Depth Reading</h1>
+            <p className="text-gray-600 dark:text-gray-400">{rinkName}</p>
           </div>
         </div>
         <div className="flex gap-3">
+          {isBluetoothSupported && (
+            <Button
+              variant={showBluetooth ? 'primary' : 'secondary'}
+              onClick={() => setShowBluetooth(!showBluetooth)}
+              leftIcon={<SignalIcon className="w-4 h-4" />}
+            >
+              {bluetoothStatus === 'connected' ? 'BT Connected' : 'Bluetooth'}
+            </Button>
+          )}
           <Button
             variant="secondary"
             onClick={handleReset}
@@ -111,7 +184,7 @@ export default function NewIceDepthPage() {
           </Button>
           <Button
             onClick={handleSave}
-            isLoading={isSaving}
+            isLoading={createReadingMutation.isPending}
             leftIcon={<CheckIcon className="w-4 h-4" />}
             disabled={measuredCount === 0}
           >
@@ -119,6 +192,51 @@ export default function NewIceDepthPage() {
           </Button>
         </div>
       </div>
+
+      {/* Bluetooth Panel */}
+      {showBluetooth && (
+        <Card className="border-2 border-primary-200 dark:border-primary-800">
+          <CardHeader
+            title="Bluetooth Device"
+            description="Connect a digital caliper or ice thickness gauge"
+            action={
+              <Badge
+                variant={
+                  bluetoothStatus === 'connected'
+                    ? 'success'
+                    : bluetoothStatus === 'connecting'
+                    ? 'warning'
+                    : 'default'
+                }
+              >
+                {bluetoothStatus}
+              </Badge>
+            }
+          />
+          <CardContent>
+            <div className="flex items-start gap-6">
+              <div className="flex-1">
+                <BluetoothInput
+                  onReading={handleBluetoothReading}
+                  onConnectionChange={handleBluetoothConnectionChange}
+                  unit="inches"
+                />
+              </div>
+              {lastBluetoothReading !== null && (
+                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Last Reading</p>
+                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                    {lastBluetoothReading}"
+                  </p>
+                </div>
+              )}
+            </div>
+            <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+              Tip: Readings are automatically applied to the selected point and advance to the next unmeasured point.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Configuration Card */}
       <Card>
@@ -158,7 +276,14 @@ export default function NewIceDepthPage() {
         {/* Rink Diagram */}
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader title="Rink Diagram" description="Click on a point to enter its depth measurement" />
+            <CardHeader
+              title="Rink Diagram"
+              description={
+                bluetoothStatus === 'connected'
+                  ? 'Take measurements with your Bluetooth device - readings auto-apply to selected point'
+                  : 'Click on a point to enter its depth measurement'
+              }
+            />
             <CardContent>
               <RinkDiagram
                 pointsConfig={pointsConfig}
